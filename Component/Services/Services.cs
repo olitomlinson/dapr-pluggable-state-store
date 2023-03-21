@@ -131,7 +131,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
     {
         _logger.LogInformation("Init");
 
-        await _stateStoreInitHelper.InitAsync(request);
+        await _stateStoreInitHelper.InitAsync(request.Properties);
 
         return;
     }

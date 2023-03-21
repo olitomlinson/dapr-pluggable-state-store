@@ -18,7 +18,7 @@ public class ErrorHandlingTests
         var pgsqlFactory = Substitute.For<IPgsqlFactory>();
         var h = new StateStoreInitHelper(pgsqlFactory);
 
-        var operationMetadata = new MapField<string,string>();
+        var operationMetadata = new Dictionary<string,string>();
         
         h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null, null);
         Assert.Fail();
@@ -32,8 +32,8 @@ public class ErrorHandlingTests
         var pgsqlFactory = Substitute.For<IPgsqlFactory>();
         var h = new StateStoreInitHelper(pgsqlFactory);
 
-        var componentMetadata = new MetadataRequest();
-        await h.InitAsync(componentMetadata);
+        var componentMetadata = new Dictionary<string,string>();
+        await h.InitAsync2(componentMetadata);
     }
 
     [TestMethod]
@@ -44,12 +44,13 @@ public class ErrorHandlingTests
         var pgsqlFactory = Substitute.For<IPgsqlFactory>();
         var h = new StateStoreInitHelper(pgsqlFactory);
 
-        var componentMetadata = new MetadataRequest();
-        componentMetadata.Properties.Add("connectionString", "some-c-string");
-        componentMetadata.Properties.Add("tenant", "schema");
-        await h.InitAsync(componentMetadata);
+        var componentMetadata = new Dictionary<string,string>(){
+            {"connectionString",    "some-c-string"},
+            {"tenant",              "schema"}
+        };
+        await h.InitAsync2(componentMetadata);
 
-        var operationMetadata = new MapField<string, string>();
+        var operationMetadata = new Dictionary<string, string>();
         h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null, null);
     }
 }

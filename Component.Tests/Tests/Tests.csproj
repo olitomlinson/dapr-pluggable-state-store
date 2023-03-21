@@ -9,17 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Grpc.AspNetCore" Version="2.40.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.1.0" />
     <PackageReference Include="MSTest.TestAdapter" Version="2.2.8" />
     <PackageReference Include="MSTest.TestFramework" Version="2.2.8" />
     <PackageReference Include="coverlet.collector" Version="3.1.2" />
     <PackageReference Include="NSubstitute" Version="4.4.0" />
     <PackageReference Include="Npgsql" Version="7.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
+    <PackageReference Include="Dapr.PluggableComponents.AspNetCore" Version="0.1.0" />
     <ProjectReference Include="../../Component/Component.csproj" />
   </ItemGroup>
-
 </Project>

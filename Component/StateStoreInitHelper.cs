@@ -34,15 +34,15 @@ namespace Helpers
             return (factory, connection);
         }
 
-        public async Task InitAsync(MetadataRequest componentMetadata){
+        public async Task InitAsync(IReadOnlyDictionary<string,string> componentMetadataProperties){
             
-            (var isTenantAware, var tenantTarget) = IsTenantAware(componentMetadata.Properties);        
+            (var isTenantAware, var tenantTarget) = IsTenantAware(componentMetadataProperties);        
             
-            _connectionString = GetConnectionString(componentMetadata.Properties);
+            _connectionString = GetConnectionString(componentMetadataProperties);
 
-            var defaultSchema = GetDefaultSchemaName(componentMetadata.Properties);
+            var defaultSchema = GetDefaultSchemaName(componentMetadataProperties);
 
-            string defaultTable = GetDefaultTableName(componentMetadata.Properties);  
+            string defaultTable = GetDefaultTableName(componentMetadataProperties);  
 
             TenantAwareDatabaseFactory = 
                 (operationMetadata, connection, logger) => {
