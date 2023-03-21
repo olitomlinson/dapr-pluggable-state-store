@@ -1,3 +1,5 @@
+### This is V2 and is currently WIP
+
 A limited capability, proof of concept, demonstrating a pluggable Dapr state store component, written in c# aspet .net 6.0, backed by PostgreSQL. 
 
 Customised to support tenant-aware behaviours, such as 'Schema-per-Tenant' and 'Table-per-Tenant''
