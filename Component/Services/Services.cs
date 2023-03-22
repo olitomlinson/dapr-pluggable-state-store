@@ -18,6 +18,7 @@ using Helpers;
 using Npgsql;
 using Dapr.PluggableComponents.Components;
 using Dapr.PluggableComponents.Components.StateStore;
+using Google.Rpc;
 
 namespace DaprComponents.Services;
 
@@ -55,21 +56,21 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
         return;
     }
 
-    private void ThrowMissingTenantIdException()
+    private async Task ThrowMissingTenantIdException()
     {
-        var badRequest = new Google.Rpc.BadRequest();
-        var des = "Missing Tenant Id on operation metadata";
+        var badRequest = new BadRequest();
+        var des = "A tenant Id must be provided via metadata";
         badRequest.FieldViolations.Add(    
-            new Google.Rpc.BadRequest.Types.FieldViolation
-                {        
-                    Field = "metadata.tenantId",
-                    Description = des
-                });
+        new Google.Rpc.BadRequest.Types.FieldViolation
+            {        
+                Field = "metadata.tenantId",
+                Description = des
+            });
 
-        var baseStatusCode = Grpc.Core.StatusCode.InvalidArgument;
+        var baseStatusCode = Grpc.Core.StatusCode.FailedPrecondition;
         var status = new Google.Rpc.Status{    
-            Code = (int)baseStatusCode
-            };
+        Code = (int)baseStatusCode
+        };
 
         status.Details.Add(Google.Protobuf.WellKnownTypes.Any.Pack(badRequest));
 
@@ -102,7 +103,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
             }
             catch(ArgumentException ex)
             {
-                ThrowMissingTenantIdException();
+                await ThrowMissingTenantIdException();
             }
 
             if (notFound)

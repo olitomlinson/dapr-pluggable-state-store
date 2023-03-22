@@ -32,7 +32,7 @@ namespace Helpers
         {
             var sql = 
                 @$"CREATE SCHEMA IF NOT EXISTS {_SafeSchema} 
-                AUTHORIZATION myusername;
+                AUTHORIZATION postgres;
                 CREATE EXTENSION IF NOT EXISTS ""uuid-ossp"";";
             
             _logger.LogDebug($"CreateSchemaAsync - {sql}");
@@ -55,7 +55,7 @@ namespace Helpers
                     ,updatedate TIMESTAMP WITH TIME ZONE NULL
                 ) 
                 TABLESPACE pg_default; 
-                ALTER TABLE IF EXISTS {SchemaAndTable} OWNER to myusername;";
+                ALTER TABLE IF EXISTS {SchemaAndTable} OWNER to postgres;";
 
             _logger.LogDebug($"CreateTableAsync - {sql}");
 
