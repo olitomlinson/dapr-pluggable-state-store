@@ -1,0 +1,51 @@
+version: '3.4'
+services:
+  db:
+    image: postgres:15.2-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=wO2VGDsMKR
+    ports:
+      - '5432:5432'
+    networks:
+      - pluggable-dapr
+    volumes: 
+      - db:/var/lib/postgresql/data
+  pluggableapp:
+    build:
+      context: .
+      dockerfile: Component/Dockerfile
+    ports:
+      - "3500:3500"
+    networks:
+      - pluggable-dapr
+    volumes:
+      - shared-volume:/tmp/dapr-components-sockets
+    depends_on:
+      - db
+  pluggableapp-dapr:
+    image: "daprio/daprd:latest"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    command: ["./daprd",
+     "-app-id", "pluggableapp",
+     "-dapr-http-port", "3500",
+     "-components-path", "/DaprComponents",
+     "-log-level","debug"]
+    volumes:
+        - "./DaprComponents/:/DaprComponents"
+        - shared-volume:/tmp/dapr-components-sockets
+    depends_on:
+      - pluggableapp
+    network_mode: "service:pluggableapp"
+volumes:
+  shared-volume:
+  db:
+    driver: local
+networks:
+    pluggable-dapr:

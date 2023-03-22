@@ -29,11 +29,11 @@ Tenant-aware operations enables a client to specify a `tenantId` as part of the 
 
 ### Prerequisite
 
-- Obtain an instance of a postgresdb (With a user named 'myusername' with sufficient permissions to create schemas and tables in the db)
+- Obtain an instance of a postgresdb (With a user named 'postgres' with sufficient permissions to create schemas and tables in the db)
 - Install Dapr CLI and ensure https://docs.dapr.io/getting-started/install-dapr-selfhost/ Dapr works.
 - Pull this repo and open Terminal in the `Component` folder
 
-#### Instructions (Schema-per-Tenant)
+#### Instructions to build and run
 
 1. `dotnet run Component.csproj`
 
@@ -82,4 +82,55 @@ spec:
 
 <img width="702" alt="image" src="https://user-images.githubusercontent.com/4224880/202821328-95b9f1d6-49a3-431d-bd48-d673178a1f8f.png">
 
-```
+### Run with Docker Compose
+
+This will create 
+- Postgres container + volume
+- Pluggable app (which uses the Pluggable Component .NET SDK)
+- A dapr sidecar (dapr-http-port 3500)
+- Docker network
+- Volume for sharing the unix domain socket
+
+Ensure the correct connection string is uncommended in `/DaprComponents/pluggable.yaml`. Look for the string starting with `host=db` and uncomment this, comment  any other connection strings!
+
+`tenant-aware-dapr-pluggable-state-store-v2 % docker compose build`
+
+`tenant-aware-dapr-pluggable-state-store-v2 % docker compose up`
+
+Perform State Management queries against the pluggable State Store, hosted at `http://localhost:3500/v1.0/state/prod-mystore`
+
+### Run on Kubernetes
+
+Install postgres in your k8s cluster :
+
+`helm repo add bitnami https://charts.bitnami.com/bitnami`
+
+`helm install my-release bitnami/postgresql`
+
+- Retain the password that is provided in the output
+- Retain the DNS address thait is provided in the output, it may look something like `my-release-postgresql.default.svc.cluster.local`
+
+
+Edit `/DaprComponents/pluggable.yaml` - Modify the connection string with the above DNS address and password.
+
+It may look something like this ; 
+
+`value: "host=my-release-postgresql.default.svc.cluster.local;port=5432;username=postgres;password=<REPLACE WITH PASSWORD FROM BITNAMI POSTGRES CHART INSTALL>;database=postgres"`
+
+Ensure you comment out any other connection strings in the `pluggable.yaml` file
+
+Build the pluggable component :
+
+`tenant-aware-dapr-pluggable-state-store-v2 % docker build -f Component/dockerfile -t component .`
+
+Deploy the pluggable component yaml : 
+
+`tenant-aware-dapr-pluggable-state-store-v2 % kubectl apply -f ./DaprComponents/pluggable.yaml`
+
+Deploy the app : 
+
+`tenant-aware-dapr-pluggable-state-store-v2 % kubectl apply -f ./deploy.yaml`
+
+Once the deployment is complete, port forward onto the dapr sidecars Dapr HTTP port (`dapr-http-port`) so you can access this from your host machine.
+
+Perform State Management queries against the pluggable State Store, hosted at `http://localhost:3500/v1.0/state/prod-mystore`
