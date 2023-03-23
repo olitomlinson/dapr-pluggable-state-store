@@ -90,7 +90,7 @@ This will create
 - Docker network
 - Volume for sharing the unix domain socket
 
-Ensure the correct connection string is uncommended in `/DaprComponents/pluggable.yaml`. Look for the string starting with `host=db` and uncomment this, comment  any other connection strings!
+Ensure the correct connection string is uncommended in `/DaprComponents/pluggablePostgres.yaml`. Look for the string starting with `host=db` and uncomment this, comment  any other connection strings!
 
 `tenant-aware-dapr-pluggable-state-store-v2 % docker compose build`
 
@@ -112,7 +112,7 @@ Install postgres in your k8s cluster :
 - Retain the DNS address thait is provided in the output, it may look something like `my-release-postgresql.default.svc.cluster.local`
 
 
-Edit `/DaprComponents/pluggable.yaml` - Modify the connection string with the above DNS address and password.
+Edit `/DaprComponents/pluggablePostgres.yaml` - Modify the connection string with the above DNS address and password.
 
 It may look something like this ; 
 
