@@ -17,6 +17,7 @@ public sealed class PluggableImage : IImage, IAsyncLifetime
 
         try
         {
+            // I really don't like this, but not sure of a better way to traverse to the root folder
             var path = new CommonDirectoryPath(new DirectoryInfo(System.Reflection.Assembly.GetEntryAssembly().Location).Parent.Parent.Parent.Parent.Parent.FullName);  
 
             await new ImageFromDockerfileBuilder()
