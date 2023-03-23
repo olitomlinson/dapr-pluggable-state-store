@@ -1,16 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Net;
+﻿using System.Net;
+using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
-using DotNet.Testcontainers.Builders;
-using Xunit;
 
 namespace IntegrationTests;
-
 
 public class Api : IClassFixture<PluggableContainer>
 {
@@ -18,72 +10,57 @@ public class Api : IClassFixture<PluggableContainer>
 
     public Api(PluggableContainer pluggableContainer)
     {
-      _pluggableContainer = pluggableContainer;
-      _pluggableContainer.SetBaseAddress();
+        _pluggableContainer = pluggableContainer;
+        _pluggableContainer.SetBaseAddress();
     }
 
     [Fact]
-    public async Task DaprHealthCheckIsSuccessful()
+    public async Task DaprHealthCheck()
     {
-      //Given
-      const string path = "v1.0/metadata";
+        const string path = "v1.0/healthz";
 
-      // When
-      var response = await _pluggableContainer.GetAsync(path)
+        var response = await _pluggableContainer.GetAsync(path)
         .ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
 
-      // var weatherForecastStream = await response.Content.ReadAsStreamAsync()
-      //   .ConfigureAwait(false);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
 
-      // var weatherForecast = await JsonSerializer.DeserializeAsync<IEnumerable<WeatherData>>(weatherForecastStream)
-      //   .ConfigureAwait(false);
+    [Fact]
+    public async Task CreateStandardStateItem()
+    {
+        const string standardStateApi = "v1.0/state/standard-postgres";
 
-      // // Then
-      Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-      // Assert.Equal(7, weatherForecast!.Count());
+        var state =  new List<State>() { new State { 
+        Key = Guid.NewGuid().ToString(), 
+        Value = Guid.NewGuid().ToString() }};
+        var jsonContent = JsonSerializer.Serialize(state);
+        using var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+        var response = await _pluggableContainer.PostAsync(standardStateApi, httpContent);
+        response.EnsureSuccessStatusCode();
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreatePluggableStateItem()
+    {
+        const string pluggableStateApi = "v1.0/state/pluggable-postgres";
+
+        var state =  new List<State>() { new State { 
+            Key = Guid.NewGuid().ToString(), 
+            Value = Guid.NewGuid().ToString(),
+            Metadata = new Dictionary<string, string> {
+            { "tenantId", "5" }
+            }}};
+
+        var jsonContent = JsonSerializer.Serialize(state);
+        using var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+        var response = await _pluggableContainer.PostAsync(pluggableStateApi, httpContent);
+        response.EnsureSuccessStatusCode();
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 }
-
-  // public sealed class Web : IClassFixture<DaprContainer>
-  // {
-  //   //private static readonly ChromeOptions ChromeOptions = new();
-
-  //   private readonly DaprContainer _weatherForecastContainer;
-
-  //   static Web()
-  //   {
-  //    // ChromeOptions.AddArgument("headless");
-  //   //  ChromeOptions.AddArgument("ignore-certificate-errors");
-  //   }
-
-  //   public Web(DaprContainer weatherForecastContainer)
-  //   {
-  //     _weatherForecastContainer = weatherForecastContainer;
-  //     _weatherForecastContainer.SetBaseAddress();
-  //   }
-
-  //   [Fact]
-  //   [Trait("Category", nameof(Web))]
-  //   public void Get_WeatherForecast_ReturnsSevenDays()
-  //   {
-  //     // Given
-  //     string ScreenshotFileName() => $"{nameof(Get_WeatherForecast_ReturnsSevenDays)}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.png";
-
-  //     using var chrome = new ChromeDriver(ChromeOptions);
-
-  //     // When
-  //     chrome.Navigate().GoToUrl(_weatherForecastContainer.BaseAddress);
-
-  //     chrome.GetScreenshot().SaveAsFile(Path.Combine(CommonDirectoryPath.GetSolutionDirectory().DirectoryPath, ScreenshotFileName()));
-
-  //     chrome.FindElement(By.TagName("fluent-button")).Click();
-
-  //     var wait = new WebDriverWait(chrome, TimeSpan.FromSeconds(10));
-  //     wait.Until(webDriver => 1.Equals(webDriver.FindElements(By.TagName("span")).Count));
-
-  //     chrome.GetScreenshot().SaveAsFile(Path.Combine(CommonDirectoryPath.GetSolutionDirectory().DirectoryPath, ScreenshotFileName()));
-
-  //     // Then
-  //     Assert.Equal(7, int.Parse(chrome.FindElement(By.TagName("span")).Text, NumberStyles.Integer, CultureInfo.InvariantCulture));
-  //   }
-  // }

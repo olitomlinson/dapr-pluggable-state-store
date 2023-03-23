@@ -1,9 +1,9 @@
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
-  name: prod-mystore
+  name: pluggable-postgres
 spec:
-  type: state.my-component
+  type: state.postgresql-tenant
   version: v1
   metadata:
   - name: connectionString

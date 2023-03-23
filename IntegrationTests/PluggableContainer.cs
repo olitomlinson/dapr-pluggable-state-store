@@ -1,113 +1,106 @@
-using System;
 using System.Net;
-using System.Net.Http;
-using System.Security.Cryptography.X509Certificates;
-using System.Threading.Tasks;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using DotNet.Testcontainers.Networks;
+using DotNet.Testcontainers.Volumes;
 using Testcontainers.PostgreSql;
 using JetBrains.Annotations;
-using Xunit;
+using System.Text.Json.Serialization;
 
 namespace IntegrationTests;
 
 [UsedImplicitly]
 public sealed class PluggableContainer : HttpClient, IAsyncLifetime
 {
-    //private static readonly X509Certificate Certificate = new X509Certificate2(PluggableImage.CertificateFilePath, PluggableImage.CertificatePassword);
-
     private static readonly PluggableImage Image = new();
-
+    private readonly IVolume _socketVolume;
     private readonly INetwork _network;
-
     private readonly IContainer _postgresContainer;
-
     private readonly IContainer _pluggableContainer;
-
     private readonly IContainer _daprContainer;
 
-    public PluggableContainer()
-      : base(new HttpClientHandler
-      {
-        // Trust the development certificate.
-      // ServerCertificateCustomValidationCallback = (_, certificate, _, _) => Certificate.Equals(certificate)
-      })
+    public PluggableContainer() : base(new HttpClientHandler())
     {
-        //const string weatherForecastStorage = "weatherForecastStorage";
-
-        //const string connectionString = $"server={weatherForecastStorage};user id={SqlEdgeBuilder.DefaultUsername};password={SqlEdgeBuilder.DefaultPassword};database={SqlEdgeBuilder.DefaultDatabase}";
-
-         _network = new NetworkBuilder()
-          .WithName(Guid.NewGuid().ToString("D"))
-           .Build();
+        var daprComponentsDirectory = $"{Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location)}/DaprComponents";
+        var dapr_http_port = 3501;
+        
+        _network = new NetworkBuilder()
+            .WithName(Guid.NewGuid().ToString("D"))
+            .Build();
 
         _postgresContainer = new PostgreSqlBuilder()
-          .WithNetwork(_network)
-          .WithNetworkAliases("db")
-          .Build();
+            .WithNetwork(_network)
+            .WithNetworkAliases("db")
+            .Build();
 
-         _daprContainer = new ContainerBuilder()
-          .WithImage("daprio/daprd:edge")
-          .WithNetwork(_network)
-          .WithNetworkAliases("dapr")
-          .WithExposedPort(3501)
-          .WithPortBinding(3501, true)
-          .WithCommand("./daprd", "-app-id", "pluggableapp", "-dapr-http-port", "3501", "-components-path", "DaprComponents", "-log-level", "debug")
-          .WithWaitStrategy(
-             Wait.ForUnixContainer()
-             .UntilHttpRequestIsSucceeded(request => 
+        _socketVolume = new VolumeBuilder().Build();
+
+        _daprContainer = new ContainerBuilder()
+            .WithImage("daprio/daprd:1.10.4-mariner-linux-arm64")
+            .WithNetwork(_network)
+            .WithNetworkAliases("dapr")
+            .WithExposedPort(dapr_http_port)
+            .WithPortBinding(dapr_http_port, true)
+            .WithVolumeMount(_socketVolume, "/tmp/dapr-components-sockets")
+            .WithResourceMapping($"{daprComponentsDirectory}/pluggablePostgres.yaml", "/DaprComponents/pluggablePostgres.yaml")
+            .WithResourceMapping($"{daprComponentsDirectory}/standardPostgres.yaml", "/DaprComponents/standardPostgres.yaml")
+            .WithCommand("./daprd", "-app-id", "pluggableapp", "-dapr-http-port", $"{dapr_http_port}", "-components-path", "/DaprComponents", "-log-level", "debug")
+            .WithWaitStrategy(
+                Wait.ForUnixContainer()
+                .UntilHttpRequestIsSucceeded(request => 
                 request
-                  .ForPort(3501)
-                  .ForPath("/v1.0/healthz")
-                  .ForStatusCode(HttpStatusCode.NoContent)))
-          .Build();
-
-
-        // TODO : Implement 
+                    .ForPort(3501)
+                    .ForPath("/v1.0/healthz")
+                    .ForStatusCode(HttpStatusCode.NoContent)))
+            .Build();
 
         _pluggableContainer = new ContainerBuilder()
-          .WithImage(Image)
-          .WithNetwork(_network)
-          .Build();
+            .WithImage(Image)
+            .WithVolumeMount(_socketVolume, "/tmp/dapr-components-sockets")
+            .WithNetwork(_network)
+            .Build();
     }
 
     public async Task InitializeAsync()
     {
-        // It is not necessary to clean up resources immediately (still good practice). The Resource Reaper will take care of orphaned resources.
-        // await Image.InitializeAsync()
-        //   .ConfigureAwait(false);
+        await Image.InitializeAsync()
+        .ConfigureAwait(false);
 
         await _network.CreateAsync()
-          .ConfigureAwait(false);
+        .ConfigureAwait(false);
 
-        // await _pluggableContainer.StartAsync()
-        //   .ConfigureAwait(false);
+        await _socketVolume.CreateAsync()
+        .ConfigureAwait(false);
+
+        await _pluggableContainer.StartAsync()
+            .ConfigureAwait(false);
 
         await _postgresContainer.StartAsync()
-          .ConfigureAwait(false);
+        .ConfigureAwait(false);
 
         await _daprContainer.StartAsync()
-          .ConfigureAwait(false);
+        .ConfigureAwait(false);
     }
 
     public async Task DisposeAsync()
     {
+        await Image.DisposeAsync()
+            .ConfigureAwait(false);
 
-        // await Image.DisposeAsync()
-        //   .ConfigureAwait(false);
-
-        // await _pluggableContainer.DisposeAsync()
-        //   .ConfigureAwait(false);
+        await _pluggableContainer.DisposeAsync()
+            .ConfigureAwait(false);
 
         await _postgresContainer.DisposeAsync()
-          .ConfigureAwait(false);
+            .ConfigureAwait(false);
         
         await _daprContainer.DisposeAsync()
-          .ConfigureAwait(false);
+            .ConfigureAwait(false);
 
         await _network.DeleteAsync()
-          .ConfigureAwait(false);
+            .ConfigureAwait(false);
+
+        await _socketVolume.DeleteAsync()
+            .ConfigureAwait(false);
     }
 
     public void SetBaseAddress()
@@ -119,7 +112,20 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
         }
         catch
         {
-          // Set the base address only once.
+            // Set the base address only once.
         }
     }
+}
+
+public class State
+{
+    [JsonPropertyName("key")]
+    public string Key { get; set; }
+
+    [JsonPropertyName("value")]
+    public string Value {get; set; }
+
+    [JsonPropertyName("metadata")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string,string> Metadata {get; set; } 
 }

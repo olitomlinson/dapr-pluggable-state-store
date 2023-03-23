@@ -8,6 +8,7 @@ Customised to support tenant-aware behaviours, such as 'Schema-per-Tenant' and '
 
 - Standard state store behaviors (BulkSet, Get, Delete)
 - Transactional API
+- Etags
 
 ### Customisations
 
@@ -15,25 +16,21 @@ Customised to support tenant-aware behaviours, such as 'Schema-per-Tenant' and '
 
 Tenant-aware operations enables a client to specify a `tenantId` as part of the `metadata` on each State Store operation, which will dynamically prefix the `Schema`, or `Table` with the given `tenantId`, allowing the logical separation of data in a multi-tenant environment.
 
-### Todo
+### To do
 
-- Dapr Etag capability support (blocked by https://github.com/dapr/dapr/issues/5520)
 - Properly utilise JSONP in `value` db field
-- Containerize 
 
 ### Won't do
 
 - Query API capability support
 
-## Run the pluggable component in Dapr stand-alone mode
+---
 
-### Prerequisite
+### Instructions to build and run
 
 - Obtain an instance of a postgresdb (With a user named 'postgres' with sufficient permissions to create schemas and tables in the db)
 - Install Dapr CLI and ensure https://docs.dapr.io/getting-started/install-dapr-selfhost/ Dapr works.
 - Pull this repo and open Terminal in the `Component` folder
-
-#### Instructions to build and run
 
 1. `dotnet run Component.csproj`
 
@@ -43,9 +40,9 @@ Tenant-aware operations enables a client to specify a `tenantId` as part of the 
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
-  name: prod-mystore
+  name: pluggable-postgres
 spec:
-  type: state.my-component
+  type: state.postgresql-tenant
   version: v1
   metadata:
   - name: connectionString
@@ -57,7 +54,7 @@ spec:
 
 4. Persist a value against a key
 
-`POST http://localhost:3500/v1.0/state/prod-mystore`
+`POST http://localhost:3500/v1.0/state/pluggable-postgres`
 
 ```json
 [{
@@ -82,6 +79,8 @@ spec:
 
 <img width="702" alt="image" src="https://user-images.githubusercontent.com/4224880/202821328-95b9f1d6-49a3-431d-bd48-d673178a1f8f.png">
 
+---
+
 ### Run with Docker Compose
 
 This will create 
@@ -97,7 +96,9 @@ Ensure the correct connection string is uncommended in `/DaprComponents/pluggabl
 
 `tenant-aware-dapr-pluggable-state-store-v2 % docker compose up`
 
-Perform State Management queries against the pluggable State Store, hosted at `http://localhost:3500/v1.0/state/prod-mystore`
+Perform State Management queries against the pluggable State Store, hosted at `http://localhost:3500/v1.0/state/pluggable-postgres`
+
+---
 
 ### Run on Kubernetes
 
@@ -133,4 +134,14 @@ Deploy the app :
 
 Once the deployment is complete, port forward onto the dapr sidecars Dapr HTTP port (`dapr-http-port`) so you can access this from your host machine.
 
-Perform State Management queries against the pluggable State Store, hosted at `http://localhost:3500/v1.0/state/prod-mystore`
+Perform State Management queries against the pluggable State Store, hosted at `http://localhost:3500/v1.0/state/pluggable-postgres`
+
+---
+
+### Run the Integration Tests
+
+The integration tests use [TestContainers](https://dotnet.testcontainers.org/) to spin up all the dependencies. Test containers rely on Docker Engine, so ensure you have Docker for Desktop or equivalent installed.
+
+note: these tests can take a while to complete on the first run through as Images are built & downloaded.
+
+`IntegrationTests % dotnet test`

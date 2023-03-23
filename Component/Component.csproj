@@ -10,5 +10,7 @@
     <PackageReference Include="Google.Api.CommonProtos" Version="2.8.0" />
     <PackageReference Include="Npgsql" Version="7.0.0" />
   </ItemGroup>
-
+    <ItemGroup>
+    <Content Include="dockerfile" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
