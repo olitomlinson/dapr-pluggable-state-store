@@ -17,7 +17,7 @@ public class HappyPathTests
 
         var componentMetadata = new Dictionary<string,string>() {
             { "connectionString", "some-c-string" }};
-        await h.InitAsync2(componentMetadata);
+        await h.InitAsync(componentMetadata);
 
         var operationMetadata = new Dictionary<string,string>();
         h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null, null);
@@ -35,7 +35,7 @@ public class HappyPathTests
             { "connectionString",   "some-c-string" },
             { "tenant",             "schema"        }};
 
-        await h.InitAsync2(componentMetadata);
+        await h.InitAsync(componentMetadata);
 
         var operationMetadata = new Dictionary<string, string>(){
             { "tenantId", "123"}};
@@ -55,7 +55,7 @@ public class HappyPathTests
         {"connectionString",    "some-c-string" },
         {"tenant",              "schema"        },
         {"schema",              "custom"        }};
-        await h.InitAsync2(componentMetadata);
+        await h.InitAsync(componentMetadata);
 
         var operationMetadata = new Dictionary<string, string>(){
         {"tenantId", "123"}};
@@ -74,7 +74,7 @@ public class HappyPathTests
             { "connectionString", "some-c-string"},
             { "tenant", "table"}
         };
-        await h.InitAsync2(componentMetadata);
+        await h.InitAsync(componentMetadata);
 
         var operationMetadata = new Dictionary<string, string>();
         operationMetadata.Add("tenantId", "123");
@@ -94,7 +94,7 @@ public class HappyPathTests
             {"tenant", "table"},
             {"table", "custom"}
         };
-        await h.InitAsync2(componentMetadata);
+        await h.InitAsync(componentMetadata);
 
         var operationMetadata = new Dictionary<string, string>();
         operationMetadata.Add("tenantId", "123");

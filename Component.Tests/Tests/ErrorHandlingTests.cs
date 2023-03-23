@@ -33,7 +33,7 @@ public class ErrorHandlingTests
         var h = new StateStoreInitHelper(pgsqlFactory);
 
         var componentMetadata = new Dictionary<string,string>();
-        await h.InitAsync2(componentMetadata);
+        await h.InitAsync(componentMetadata);
     }
 
     [TestMethod]
@@ -48,7 +48,7 @@ public class ErrorHandlingTests
             {"connectionString",    "some-c-string"},
             {"tenant",              "schema"}
         };
-        await h.InitAsync2(componentMetadata);
+        await h.InitAsync(componentMetadata);
 
         var operationMetadata = new Dictionary<string, string>();
         h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null, null);

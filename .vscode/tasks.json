@@ -1,6 +1,29 @@
 {
     "version": "2.0.0",
     "tasks": [
+        { 
+            "label": ".NET Core Integration Test with debugger", 
+            "type": "process", 
+            "isBackground": true, 
+            "command": "dotnet", 
+            "args": [ "test" ], 
+            "options": 
+                { 
+                    "cwd": "${workspaceFolder}/IntegrationTests", 
+                    "env": 
+                    { 
+                        "VSTEST_HOST_DEBUG": "1" 
+                    }, 
+                }, 
+            "group": "test", "presentation": 
+                { 
+                    "echo": true,
+                    "reveal": "always",
+                    "focus": false,
+                    "panel": "shared"
+                },
+            "problemMatcher": [] 
+        },
         {
             "label": "build",
             "command": "dotnet",

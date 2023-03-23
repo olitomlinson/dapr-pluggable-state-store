@@ -1,0 +1,12 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: prod-mystore
+spec:
+  type: state.my-component
+  version: v1
+  metadata:
+  - name: connectionString
+    value: "host=db;port=5432;username=postgres;password=postgres;database=postgres"
+  - name: tenant
+    value: table

@@ -20,7 +20,7 @@ public sealed class PluggableImage : IImage, IAsyncLifetime
 
     private readonly SemaphoreSlim _semaphoreSlim = new(1, 1);
 
-    private readonly IImage _image = new DockerImage("localhost/testcontainers", "weather-forecast", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString());
+    private readonly IImage _image = new DockerImage("component");
 
     public async Task InitializeAsync()
     {
