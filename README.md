@@ -122,11 +122,11 @@ Ensure you comment out any other connection strings in the `pluggable.yaml` file
 
 Build the pluggable component :
 
-`tenant-aware-dapr-pluggable-state-store-v2 % docker build -f dockerfile -t component .`
+`tenant-aware-dapr-pluggable-state-store-v2 % docker build -f dockerfile -t pluggable-component .`
 
 Deploy the pluggable component yaml : 
 
-`tenant-aware-dapr-pluggable-state-store-v2 % kubectl apply -f ./DaprComponents/pluggable.yaml`
+`tenant-aware-dapr-pluggable-state-store-v2 % kubectl apply -f ./DaprComponents/pluggablePostgres.yaml`
 
 Deploy the app : 
 

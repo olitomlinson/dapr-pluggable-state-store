@@ -14,11 +14,11 @@ spec:
       labels:
         app: app
       annotations:
-        dapr.io/pluggable-components: "component" ## the name of the pluggable component container separated by `,`, e.g "componentA,componentB".
+        dapr.io/pluggable-components: "pluggable-component" ## the name of the pluggable component container separated by `,`, e.g "componentA,componentB".
         dapr.io/app-id: "my-app"
         dapr.io/enabled: "true"
     spec:
       containers:
-        - name: component
-          image: component:latest
+        - name: pluggable-component
+          image: pluggable-component:latest
           imagePullPolicy: Never
