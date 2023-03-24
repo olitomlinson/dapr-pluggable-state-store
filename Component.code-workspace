@@ -1,7 +1,19 @@
 {
 	"folders": [
 		{
-			"name": "dapr-pluggable-state-store",
+			"name": "Source",
+			"path": "src"
+		},
+		{
+			"name": "Unit Tests",
+			"path": "tests/unit"
+		},
+		{
+			"name": "Integration Tests",
+			"path": "tests/integration"
+		},
+		{
+			"name": "Root",
 			"path": "."
 		}
 	],
