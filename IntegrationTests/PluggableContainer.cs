@@ -23,13 +23,15 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
     {
         var daprComponentsDirectory = $"{Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)}/DaprComponents";
         ushort dapr_http_port = 3501;
+        var containerSuffix = Guid.NewGuid().ToString("N").Substring(23);
         
         _network = new NetworkBuilder()
-            .WithName(Guid.NewGuid().ToString("D"))
+            .WithName($"network-{containerSuffix}")
             .Build();
 
         _postgresContainer = new PostgreSqlBuilder()
             .WithNetwork(_network)
+            .WithName($"postgres-{containerSuffix}")
             .WithNetworkAliases("db")
             .Build();
 
@@ -37,6 +39,7 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
 
         _daprContainer = new ContainerBuilder()
             .WithImage("daprio/daprd:1.10.4-mariner-linux-arm64")
+            .WithName($"dapr-{containerSuffix}")
             .WithNetwork(_network)
             .WithNetworkAliases("dapr")
             .WithExposedPort(dapr_http_port)
@@ -44,7 +47,7 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
             .WithVolumeMount(_socketVolume, "/tmp/dapr-components-sockets")
             .WithResourceMapping($"{daprComponentsDirectory}/pluggablePostgres.yaml", "/DaprComponents/pluggablePostgres.yaml")
             .WithResourceMapping($"{daprComponentsDirectory}/standardPostgres.yaml", "/DaprComponents/standardPostgres.yaml")
-            .WithCommand("./daprd", "-app-id", "pluggableapp", "-dapr-http-port", $"{dapr_http_port}", "-components-path", "/DaprComponents", "-log-level", "debug")
+            .WithCommand("./daprd", "-app-id", "pluggableapp", "-dapr-http-port", dapr_http_port.ToString(), "-components-path", "/DaprComponents", "-log-level", "debug")
             .WithWaitStrategy(
                 Wait.ForUnixContainer()
                 .UntilHttpRequestIsSucceeded(request =>  
@@ -56,6 +59,7 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
 
         _pluggableContainer = new ContainerBuilder()
             .WithImage(Image)
+            .WithName($"pluggable-component-{containerSuffix}")
             .WithVolumeMount(_socketVolume, "/tmp/dapr-components-sockets")
             .WithNetwork(_network)
             .Build();
