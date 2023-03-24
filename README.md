@@ -1,8 +1,14 @@
-### This is V2 and is currently WIP
+### Status
 
-A limited capability, proof of concept, demonstrating a pluggable Dapr state store component, written in c# aspet .net 6.0, backed by PostgreSQL. 
+This probject is currently a Work in Progress
 
-Customised to support tenant-aware behaviours, such as 'Schema-per-Tenant' and 'Table-per-Tenant''
+### Purpose
+
+A complete .NET 6 implementation of a Dapr state store using the Pluggable Components API.
+
+#### What makes this different from the current in-tree Postgres Dapr Component? 
+
+This component is specialised with tenant-aware state operations, such as 'Schema-per-Tenant' and 'Table-per-Tenant''
 
 ### Working capabilities
 
@@ -10,11 +16,9 @@ Customised to support tenant-aware behaviours, such as 'Schema-per-Tenant' and '
 - Transactional API
 - Etags
 
-### Customisations
+### What are tenant-aware state operations?
 
-- Tenant-aware operations ('Schema-per-Tenant', 'Table-per-Tenant'). See below instructions to run 'Schema-per-Tenant' example.
-
-Tenant-aware operations enables a client to specify a `tenantId` as part of the `metadata` on each State Store operation, which will dynamically prefix the `Schema`, or `Table` with the given `tenantId`, allowing the logical separation of data in a multi-tenant environment.
+Tenant-aware state operations requires a client to specify a `tenantId` as part of the `metadata` on each State Store operation, which will dynamically prefix the `Schema`, or `Table` with the given `tenantId`, allowing the logical separation of data in a multi-tenant environment.
 
 ### To do
 
@@ -26,15 +30,17 @@ Tenant-aware operations enables a client to specify a `tenantId` as part of the 
 
 ---
 
-### Instructions to build and run
+### Instructions to build and run (Inner dev loop)
 
 - Obtain an instance of a postgresdb (With a user named 'postgres' with sufficient permissions to create schemas and tables in the db)
 - Install Dapr CLI and ensure https://docs.dapr.io/getting-started/install-dapr-selfhost/ Dapr works.
-- Pull this repo and open Terminal in the `Component` folder
+- Pull this repo and open the `src` folder
 
-1. `dotnet run Component.csproj`
+Build the pluggable component :
 
-2. create a new `component.yaml` for the pluggable component and place it the default directory where Dapr discovers your components on your machine. Replace with your connection string to your postgresql db instance.
+`src % dotnet run Component.csproj`
+
+Create a new `component.yaml` for the pluggable component and place it the default directory where Dapr discovers your components on your machine. Replace with your connection string to your postgresql db instance.
 
 ```yaml
 apiVersion: dapr.io/v1alpha1
@@ -50,9 +56,12 @@ spec:
   - name: tenant
     value: schema
 ```
-3. `dapr run --app-id myapp --dapr-http-port 3500`
 
-4. Persist a value against a key
+Run the dapr process :
+
+`dapr run --app-id myapp --dapr-http-port 3500`
+
+Persist a value against a key :
 
 `POST http://localhost:3500/v1.0/state/pluggable-postgres`
 
@@ -75,7 +84,8 @@ spec:
 	}
 }]
 ```
-5. Observe a new Scehma in your posgresql database has been created called `"123-public"`. Observe the persisted Key Value persisted in the `"state"` Table
+
+Observe a new Scehma in your posgresql database has been created called `"123-public"`. Observe the persisted Key Value persisted in the `"state"` Table
 
 <img width="702" alt="image" src="https://user-images.githubusercontent.com/4224880/202821328-95b9f1d6-49a3-431d-bd48-d673178a1f8f.png">
 
@@ -140,8 +150,8 @@ Perform State Management queries against the pluggable State Store, hosted at `h
 
 ### Run the Integration Tests
 
-The integration tests use [TestContainers](https://dotnet.testcontainers.org/) to spin up all the dependencies. Test containers rely on Docker Engine, so ensure you have Docker for Desktop or equivalent installed.
+The integration tests use [TestContainers](https://dotnet.testcontainers.org/) to spin up all the dependencies (simimilar to docker compose). Test containers rely on Docker Engine, so ensure you have Docker for Desktop or equivalent installed.
 
-note: these tests can take a while to complete on the first run through as Images are built & downloaded.
+_Note:_ these tests can take a while to complete on the first run through as Images are built & downloaded.
 
 `IntegrationTests % dotnet test`
