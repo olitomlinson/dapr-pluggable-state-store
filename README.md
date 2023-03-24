@@ -36,9 +36,9 @@ Tenant-aware state operations requires a client to specify a `tenantId` as part 
 - Install Dapr CLI and ensure https://docs.dapr.io/getting-started/install-dapr-selfhost/ Dapr works.
 - Pull this repo and open the `src` folder
 
-Build the pluggable component :
+Build & run the pluggable component :
 
-`src % dotnet run Component.csproj`
+`dotnet run`
 
 Create a new `component.yaml` for the pluggable component and place it the default directory where Dapr discovers your components on your machine. Replace with your connection string to your postgresql db instance.
 
@@ -102,9 +102,9 @@ This will create
 
 Ensure the correct connection string is uncommended in `/DaprComponents/pluggablePostgres.yaml`. Look for the string starting with `host=db` and uncomment this, comment  any other connection strings!
 
-`tenant-aware-dapr-pluggable-state-store-v2 % docker compose build`
+`docker compose build`
 
-`tenant-aware-dapr-pluggable-state-store-v2 % docker compose up`
+`docker compose up`
 
 Perform State Management queries against the pluggable State Store, hosted at `http://localhost:3500/v1.0/state/pluggable-postgres`
 
@@ -132,15 +132,15 @@ Ensure you comment out any other connection strings in the `pluggable.yaml` file
 
 Build the pluggable component :
 
-`tenant-aware-dapr-pluggable-state-store-v2 % docker build -f dockerfile -t pluggable-component .`
+` docker build -f dockerfile -t pluggable-component .`
 
 Deploy the pluggable component yaml : 
 
-`tenant-aware-dapr-pluggable-state-store-v2 % kubectl apply -f ./DaprComponents/pluggablePostgres.yaml`
+` kubectl apply -f ./DaprComponents/pluggablePostgres.yaml`
 
 Deploy the app : 
 
-`tenant-aware-dapr-pluggable-state-store-v2 % kubectl apply -f ./deploy.yaml`
+` kubectl apply -f ./deploy.yaml`
 
 Once the deployment is complete, port forward onto the dapr sidecars Dapr HTTP port (`dapr-http-port`) so you can access this from your host machine.
 
@@ -154,4 +154,6 @@ The integration tests use [TestContainers](https://dotnet.testcontainers.org/) t
 
 _Note:_ these tests can take a while to complete on the first run through as Images are built & downloaded.
 
-`IntegrationTests % dotnet test`
+Navigate to the `\tests\integration\` folder : 
+
+` dotnet test`
