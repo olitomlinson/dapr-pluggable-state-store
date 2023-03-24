@@ -1,7 +1,7 @@
 {
 	"folders": [
 		{
-			"name": "tenant-aware-dapr-pluggable-state-store-v2",
+			"name": "dapr-pluggable-state-store",
 			"path": "."
 		}
 	],

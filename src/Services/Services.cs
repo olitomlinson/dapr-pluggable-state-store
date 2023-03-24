@@ -160,7 +160,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
                 var value = System.Text.Encoding.UTF8.GetString(request.Value.Span);
                 tran = await conn.BeginTransactionAsync();
                 await dbfactory(request.Metadata).UpsertAsync(request.Key, value, request.ETag ?? String.Empty, tran);   
-                await tran.CommitAsync();         
+                await tran.CommitAsync();        
                 
             }
             catch(Exception ex)
