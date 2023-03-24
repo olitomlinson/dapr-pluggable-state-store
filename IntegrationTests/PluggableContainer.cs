@@ -23,11 +23,14 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
     private readonly ushort _dapr_http_port = 3501;
     private readonly ushort _dapr_grpc_port = 50002;
 
+    private string _dapr_app_id;
+
     public PluggableContainer() : base(new HttpClientHandler())
     {
         var daprComponentsDirectory = $"{Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)}/DaprComponents";
 
         var containerSuffix = Guid.NewGuid().ToString("N").Substring(23);
+        _dapr_app_id = $"pluggableapp-{containerSuffix}";
         
         _network = new NetworkBuilder()
             .WithName($"network-{containerSuffix}")
@@ -53,7 +56,7 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
             .WithVolumeMount(_socketVolume, "/tmp/dapr-components-sockets")
             .WithResourceMapping($"{daprComponentsDirectory}/pluggablePostgres.yaml", "/DaprComponents/pluggablePostgres.yaml")
             .WithResourceMapping($"{daprComponentsDirectory}/standardPostgres.yaml", "/DaprComponents/standardPostgres.yaml")
-            .WithCommand("./daprd", "-app-id", "pluggableapp", "-dapr-http-port", _dapr_http_port.ToString(), "-dapr-grpc-port", _dapr_grpc_port.ToString(), "-components-path", "/DaprComponents", "-log-level", "debug")
+            .WithCommand("./daprd", "-app-id", _dapr_app_id, "-dapr-http-port", _dapr_http_port.ToString(), "-dapr-grpc-port", _dapr_grpc_port.ToString(), "-components-path", "/DaprComponents", "-log-level", "debug")
             .WithWaitStrategy(
                 Wait.ForUnixContainer()
                 .UntilHttpRequestIsSucceeded(request =>  
@@ -104,22 +107,13 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
         }
     }
 
+    public async Task<ExecResult> GetStateViaSQL(string key, string tenantId){
+        return await ((PostgreSqlContainer)_postgresContainer).ExecScriptAsync($"SELECT value FROM \"public\".\"{tenantId}-state\" WHERE key = '{_dapr_app_id}'");
+    }
+
     public DaprClient GetDaprClient(){
         Environment.SetEnvironmentVariable("DAPR_HTTP_PORT", _daprContainer.GetMappedPublicPort(_dapr_http_port).ToString());
         Environment.SetEnvironmentVariable("DAPR_GRPC_PORT", _daprContainer.GetMappedPublicPort(_dapr_grpc_port).ToString());
         return new DaprClientBuilder().Build();
     }
-}
-
-public class State
-{
-    [JsonPropertyName("key")]
-    public string Key { get; set; }
-
-    [JsonPropertyName("value")]
-    public string Value {get; set; }
-
-    [JsonPropertyName("metadata")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Dictionary<string,string> Metadata {get; set; } 
 }
