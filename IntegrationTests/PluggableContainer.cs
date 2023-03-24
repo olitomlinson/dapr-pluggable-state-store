@@ -21,8 +21,8 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
 
     public PluggableContainer() : base(new HttpClientHandler())
     {
-        var daprComponentsDirectory = $"{Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location)}/DaprComponents";
-        var dapr_http_port = 3501;
+        var daprComponentsDirectory = $"{Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)}/DaprComponents";
+        ushort dapr_http_port = 3501;
         
         _network = new NetworkBuilder()
             .WithName(Guid.NewGuid().ToString("D"))
@@ -47,9 +47,9 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
             .WithCommand("./daprd", "-app-id", "pluggableapp", "-dapr-http-port", $"{dapr_http_port}", "-components-path", "/DaprComponents", "-log-level", "debug")
             .WithWaitStrategy(
                 Wait.ForUnixContainer()
-                .UntilHttpRequestIsSucceeded(request => 
+                .UntilHttpRequestIsSucceeded(request =>  
                 request
-                    .ForPort(3501)
+                    .ForPort(dapr_http_port)
                     .ForPath("/v1.0/healthz")
                     .ForStatusCode(HttpStatusCode.NoContent)))
             .Build();
@@ -63,44 +63,22 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await Image.InitializeAsync()
-        .ConfigureAwait(false);
-
-        await _network.CreateAsync()
-        .ConfigureAwait(false);
-
-        await _socketVolume.CreateAsync()
-        .ConfigureAwait(false);
-
-        await _pluggableContainer.StartAsync()
-            .ConfigureAwait(false);
-
-        await _postgresContainer.StartAsync()
-        .ConfigureAwait(false);
-
-        await _daprContainer.StartAsync()
-        .ConfigureAwait(false);
+        await Image.InitializeAsync().ConfigureAwait(false);
+        await _network.CreateAsync().ConfigureAwait(false);
+        await _socketVolume.CreateAsync().ConfigureAwait(false);
+        await _pluggableContainer.StartAsync().ConfigureAwait(false);
+        await _postgresContainer.StartAsync().ConfigureAwait(false);
+        await _daprContainer.StartAsync().ConfigureAwait(false);
     }
 
     public async Task DisposeAsync()
     {
-        await Image.DisposeAsync()
-            .ConfigureAwait(false);
-
-        await _pluggableContainer.DisposeAsync()
-            .ConfigureAwait(false);
-
-        await _postgresContainer.DisposeAsync()
-            .ConfigureAwait(false);
-        
-        await _daprContainer.DisposeAsync()
-            .ConfigureAwait(false);
-
-        await _network.DeleteAsync()
-            .ConfigureAwait(false);
-
-        await _socketVolume.DeleteAsync()
-            .ConfigureAwait(false);
+        await Image.DisposeAsync().ConfigureAwait(false);
+        await _pluggableContainer.DisposeAsync().ConfigureAwait(false);
+        await _postgresContainer.DisposeAsync().ConfigureAwait(false);
+        await _daprContainer.DisposeAsync().ConfigureAwait(false);
+        await _network.DeleteAsync().ConfigureAwait(false);
+        await _socketVolume.DeleteAsync().ConfigureAwait(false);
     }
 
     public void SetBaseAddress()

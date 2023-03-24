@@ -23,7 +23,7 @@ public sealed class PluggableImage : IImage, IAsyncLifetime
             await new ImageFromDockerfileBuilder()
                 .WithName(this)
                 .WithDockerfileDirectory(path, string.Empty)
-                .WithDockerfile("Component/dockerfile")
+                .WithDockerfile("dockerfile")
                 .WithBuildArgument("RESOURCE_REAPER_SESSION_ID", ResourceReaper.DefaultSessionId.ToString("D")) // https://github.com/testcontainers/testcontainers-dotnet/issues/602.
                 .WithDeleteIfExists(false)
                 .Build()
