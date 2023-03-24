@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-      <ProjectReference Include="../src/Component.csproj" />
+      <ProjectReference Include="../../src/Component.csproj" />
     <PackageReference Include="Testcontainers" Version="3.0.0" />
     <PackageReference Include="Testcontainers.PostgreSql" Version="3.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.1.0" />
