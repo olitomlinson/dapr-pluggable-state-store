@@ -6,6 +6,7 @@ using DotNet.Testcontainers.Volumes;
 using Testcontainers.PostgreSql;
 using JetBrains.Annotations;
 using System.Text.Json.Serialization;
+using Dapr.Client;
 
 namespace IntegrationTests;
 
@@ -19,10 +20,13 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
     private readonly IContainer _pluggableContainer;
     private readonly IContainer _daprContainer;
 
+    private readonly ushort _dapr_http_port = 3501;
+    private readonly ushort _dapr_grpc_port = 50002;
+
     public PluggableContainer() : base(new HttpClientHandler())
     {
         var daprComponentsDirectory = $"{Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)}/DaprComponents";
-        ushort dapr_http_port = 3501;
+
         var containerSuffix = Guid.NewGuid().ToString("N").Substring(23);
         
         _network = new NetworkBuilder()
@@ -42,17 +46,19 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
             .WithName($"dapr-{containerSuffix}")
             .WithNetwork(_network)
             .WithNetworkAliases("dapr")
-            .WithExposedPort(dapr_http_port)
-            .WithPortBinding(dapr_http_port, true)
+            .WithExposedPort(_dapr_http_port)
+            .WithPortBinding(_dapr_http_port, true)
+            .WithExposedPort(_dapr_grpc_port)
+            .WithPortBinding(_dapr_grpc_port, true)
             .WithVolumeMount(_socketVolume, "/tmp/dapr-components-sockets")
             .WithResourceMapping($"{daprComponentsDirectory}/pluggablePostgres.yaml", "/DaprComponents/pluggablePostgres.yaml")
             .WithResourceMapping($"{daprComponentsDirectory}/standardPostgres.yaml", "/DaprComponents/standardPostgres.yaml")
-            .WithCommand("./daprd", "-app-id", "pluggableapp", "-dapr-http-port", dapr_http_port.ToString(), "-components-path", "/DaprComponents", "-log-level", "debug")
+            .WithCommand("./daprd", "-app-id", "pluggableapp", "-dapr-http-port", _dapr_http_port.ToString(), "-dapr-grpc-port", _dapr_grpc_port.ToString(), "-components-path", "/DaprComponents", "-log-level", "debug")
             .WithWaitStrategy(
                 Wait.ForUnixContainer()
                 .UntilHttpRequestIsSucceeded(request =>  
                 request
-                    .ForPort(dapr_http_port)
+                    .ForPort(_dapr_http_port)
                     .ForPath("/v1.0/healthz")
                     .ForStatusCode(HttpStatusCode.NoContent)))
             .Build();
@@ -89,13 +95,19 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
     {
         try
         {
-            var uriBuilder = new UriBuilder("http", _daprContainer.Hostname, _daprContainer.GetMappedPublicPort(3501));
+            var uriBuilder = new UriBuilder("http", _daprContainer.Hostname, _daprContainer.GetMappedPublicPort(_dapr_http_port));
             BaseAddress = uriBuilder.Uri;
         }
         catch
         {
             // Set the base address only once.
         }
+    }
+
+    public DaprClient GetDaprClient(){
+        Environment.SetEnvironmentVariable("DAPR_HTTP_PORT", _daprContainer.GetMappedPublicPort(_dapr_http_port).ToString());
+        Environment.SetEnvironmentVariable("DAPR_GRPC_PORT", _daprContainer.GetMappedPublicPort(_dapr_grpc_port).ToString());
+        return new DaprClientBuilder().Build();
     }
 }
 
