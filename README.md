@@ -66,23 +66,26 @@ Persist a value against a key :
 `POST http://localhost:3500/v1.0/state/pluggable-postgres`
 
 ```json
-[{
-	"key": "1",
-	"value": { 
-		"name" : "Dave Mustaine" 
-	},
-	"metadata": { 
-		"tenantId" : "123" 
-	}
-},{
-	"key": "2",
-	"value": { 
-		"name" : "Kirk Hammett" 
-	},
-	"metadata": { 
-		"tenantId" : "123"
-	}
-}]
+[
+  {
+    "key": "1",
+    "value": {
+      "name": "Dave Mustaine"
+    },
+    "metadata": {
+      "tenantId": "123"
+    }
+  },
+  {
+    "key": "2",
+    "value": {
+      "name": "Kirk Hammett"
+    },
+    "metadata": {
+      "tenantId": "123"
+    }
+  }
+]
 ```
 
 Observe a new Scehma in your posgresql database has been created called `"123-public"`. Observe the persisted Key Value persisted in the `"state"` Table
