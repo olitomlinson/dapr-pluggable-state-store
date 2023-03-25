@@ -4,7 +4,7 @@ This probject is currently a Work in Progress
 
 ### Purpose
 
-A complete .NET 6 implementation of a Dapr state store using the Pluggable Components API.
+A complete .NET 6 implementation of a [Dapr state store](https://docs.dapr.io/developing-applications/building-blocks/state-management/state-management-overview/) using the [Pluggable Components API](https://docs.dapr.io/developing-applications/develop-components/pluggable-components/pluggable-components-overview/).
 
 #### What makes this different from the current in-tree Postgres Dapr Component? 
 
