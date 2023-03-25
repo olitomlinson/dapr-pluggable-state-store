@@ -60,6 +60,48 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         Assert.Null(retrievedState);
     }
 
+
+    [Fact]
+    public async Task SequentialUpdatesWithoutEtag()
+    {
+        var key = "What-Comes-First";
+        var seedValue = "Chicken";
+        var tenantId = "101";
+
+        await _daprClient.SaveStateAsync("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var firstGet = await _daprClient.GetStateAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+
+        var updatedValue = "Egg";
+        await _daprClient.SaveStateAsync("pluggable-postgres", key, updatedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var secondGet = await _daprClient.GetStateAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+
+        Assert.Multiple(
+            () => Assert.Equal(seedValue,firstGet),
+            () => Assert.Equal(updatedValue, secondGet)
+        );
+    }
+
+    [Fact]
+    public async Task SequentialUpdatesWithEtag()
+    {
+        var key = "What-Comes-First";
+        var seedValue = "Chicken";
+        var tenantId = "101";
+
+        await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+
+        var updatedValue = "Egg";
+
+        var success = await _daprClient.TrySaveStateAsync<string>("pluggable-postgres", key, updatedValue, etag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var secondGet = await _daprClient.GetStateAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+  
+        Assert.Multiple(
+            () => Assert.Equal(seedValue,firstGet),
+            () => Assert.Equal(updatedValue, secondGet)
+        );
+    }
+
     public async Task ScanEntireDatabaseForStateBleedAcrossTenants()
     {
         // TODO : Write a SQL query that scans through all tables in all schemas,

@@ -125,74 +125,144 @@ namespace Helpers
 
         public async Task InsertOrUpdateAsync(string key, string value, string etag, NpgsqlTransaction transaction = null)
         {
-      
-            var query = @$"INSERT INTO {SchemaAndTable} 
-            (
-                key
-                ,value
-                ,etag
-            ) 
-            VALUES 
-            (
-                @1 
-                ,@2
-                ,uuid_generate_v4()::text
-            )
-            ON CONFLICT (key)
-            DO
-            UPDATE SET 
-                value = @2
-                ,updatedate = NOW()
-                ,etag = uuid_generate_v4()::text
-            WHERE {SchemaAndTable}.etag = @3
-            ;";
-            
+            int rowsAffected = 0;  
+            var correlationId = Guid.NewGuid().ToString("N").Substring(23);   
 
-            _logger.LogDebug($"InsertOrUpdateAsync : key: [{key}], value: [{value}], sql: [{query}]");
-
-            await using (var cmd = new NpgsqlCommand(query, _connection, transaction))
+            if (String.IsNullOrEmpty(etag))
             {
-                cmd.Parameters.AddWithValue("1", NpgsqlTypes.NpgsqlDbType.Text, key);
-                cmd.Parameters.AddWithValue("2", NpgsqlTypes.NpgsqlDbType.Jsonb, value);
-                cmd.Parameters.AddWithValue("3", NpgsqlTypes.NpgsqlDbType.Text, etag);
-                var rowsAffected = await cmd.ExecuteNonQueryAsync();
+                var query = @$"INSERT INTO {SchemaAndTable} 
+                (
+                    key
+                    ,value
+                    ,etag
+                ) 
+                VALUES 
+                (
+                    @1 
+                    ,@2
+                    ,uuid_generate_v4()::text
+                )
+                ON CONFLICT (key)
+                DO
+                UPDATE SET 
+                    value = @2
+                    ,updatedate = NOW()
+                ;";
 
-                if (!string.IsNullOrEmpty(etag) && rowsAffected == 0)
-                    throw new Dapr.PluggableComponents.Components.StateStore.ETagMismatchException();
+                _logger.LogDebug($"({correlationId}) Etag not present - InsertOrUpdateAsync : key: [{key}], value: [{value}], sql: [{query}]");
+
+                await using (var cmd = new NpgsqlCommand(query, _connection, transaction))
+                {
+                    cmd.Parameters.AddWithValue("1", NpgsqlTypes.NpgsqlDbType.Text, key);
+                    cmd.Parameters.AddWithValue("2", NpgsqlTypes.NpgsqlDbType.Jsonb, value);
+
+                    rowsAffected = await cmd.ExecuteNonQueryAsync();
+                    _logger.LogDebug($"({correlationId}) {rowsAffected} Row inserted/updated");
+                }
             }
-            _logger.LogDebug($"Row inserted/updated");
+            else
+            {
+                var query = @$"
+                UPDATE {SchemaAndTable} 
+                SET 
+                    value = @2
+                    ,updatedate = NOW()
+                    ,etag = uuid_generate_v4()::text
+                WHERE 
+                    key = (@1)
+                    AND 
+                    etag = (@3)
+                ;";
+                
+                _logger.LogDebug($"({correlationId}) Etag present - InsertOrUpdateAsync : key: [{key}], value: [{value}], etag: [{etag}], sql: [{query}]");
+
+                await using (var cmd = new NpgsqlCommand(query, _connection, transaction))
+                {
+                    cmd.Parameters.AddWithValue("1", NpgsqlTypes.NpgsqlDbType.Text, key);
+                    cmd.Parameters.AddWithValue("2", NpgsqlTypes.NpgsqlDbType.Jsonb, value);
+                    cmd.Parameters.AddWithValue("3", NpgsqlTypes.NpgsqlDbType.Text, etag);
+
+                    rowsAffected = await cmd.ExecuteNonQueryAsync();
+                    _logger.LogDebug($"({correlationId}) {rowsAffected} Row updated");
+                }
+            }
+
+             if (rowsAffected == 0 && !string.IsNullOrEmpty(etag))
+             {
+                _logger.LogDebug($"({correlationId}) Etag present but no rows modified, throwing EtagMismatchException");
+                throw new Dapr.PluggableComponents.Components.StateStore.ETagMismatchException();
+             }
         }
 
         public async Task DeleteRowAsync(string key, string etag, NpgsqlTransaction transaction = null)
         {
             // TODO this is vulenerable to sql-injection as-is, need to try converting to a proc because
             // you can't use parameters in code blocks like below.
-            var sql = @$"
-            DO $$
-            BEGIN 
-                IF EXISTS
-                    ( SELECT 1
-                    FROM   information_schema.tables 
-                    WHERE  table_schema = '{_schema}'
-                    AND    table_name = '{_table}'
-                    )
-                THEN
-                    DELETE FROM {SchemaAndTable}
-                    WHERE 
-                        key = '{key}'
-                        AND
-                        etag = '{etag}';
-                END IF;
-            END
-            $$;";
+            var correlationId = Guid.NewGuid().ToString("N").Substring(23);   
+            var rowsDeleted = 0;
 
-            _logger.LogDebug($"DeleteRowAsync: key: [{key}], etag: [{etag}], sql: [{sql}]");
-
-            await using (var cmd = new NpgsqlCommand(sql, _connection, transaction))
+            if (string.IsNullOrEmpty(etag))
             {
-                var rowsDeleted = await cmd.ExecuteNonQueryAsync();
-                if (rowsDeleted == 0 && !string.IsNullOrEmpty(etag))
-                    throw new Dapr.PluggableComponents.Components.StateStore.ETagMismatchException();
+                var sql = @$"
+                DO $$
+                BEGIN 
+                    IF EXISTS
+                        ( SELECT 1
+                        FROM   information_schema.tables 
+                        WHERE  table_schema = '{_schema}'
+                        AND    table_name = '{_table}'
+                        )
+                    THEN
+                        DELETE FROM {SchemaAndTable}
+                        WHERE 
+                            key = '{key}'
+                    END IF;
+                END
+                $$;";
+
+                _logger.LogDebug($"({correlationId}) Etag not present - DeleteRowAsync: key: [{key}], sql: [{sql}]");
+
+                await using (var cmd = new NpgsqlCommand(sql, _connection, transaction))
+                {
+                    rowsDeleted = await cmd.ExecuteNonQueryAsync();
+                    _logger.LogDebug($"({correlationId}) {rowsDeleted} Row/s deleted");
+                }
+
+            }
+            else
+            {
+                var sql = @$"
+                DO $$
+                BEGIN 
+                    IF EXISTS
+                        ( SELECT 1
+                        FROM   information_schema.tables 
+                        WHERE  table_schema = '{_schema}'
+                        AND    table_name = '{_table}'
+                        )
+                    THEN
+                        DELETE FROM {SchemaAndTable}
+                        WHERE 
+                            key = '{key}'
+                            AND
+                            etag = '{etag}';
+                    END IF;
+                END
+                $$;";
+
+                _logger.LogDebug($"({correlationId}) Etag not present - DeleteRowAsync: key: [{key}], etag: [{etag}], sql: [{sql}]");
+
+                await using (var cmd = new NpgsqlCommand(sql, _connection, transaction))
+                {
+                    rowsDeleted = await cmd.ExecuteNonQueryAsync();
+                    _logger.LogDebug($"({correlationId}) {rowsDeleted} Row/s deleted");
+                }
+            }
+
+            if (rowsDeleted == 0 && !string.IsNullOrEmpty(etag))
+            {
+                _logger.LogDebug($"({correlationId}) Etag present but no rows deleted, throwing EtagMismatchException");
+                throw new Dapr.PluggableComponents.Components.StateStore.ETagMismatchException();
             }
         }
     }
@@ -202,14 +272,5 @@ namespace Helpers
 public static class PostgresExtensions{
     public static bool TableDoesNotExist(this PostgresException ex){
         return (ex.SqlState == "42P01");
-    }
-    public static bool AnyErrorExcludingTableDoesNotExist(this PostgresException ex){
-        return !TableDoesNotExist(ex);
-    }
-    public static bool SchemaDoesNotExist(this PostgresException ex){
-        return (ex.SqlState == "42P06");
-    }
-     public static bool AnyErrorExcludingSchemaDoesNotExist(this PostgresException ex){
-        return (!SchemaDoesNotExist(ex));
     }
 }
