@@ -146,6 +146,7 @@ namespace Helpers
                 DO
                 UPDATE SET 
                     value = @2
+                    ,etag = uuid_generate_v4()::text
                     ,updatedate = NOW()
                 ;";
 

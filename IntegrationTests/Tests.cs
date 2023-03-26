@@ -102,6 +102,48 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         );
     }
 
+    [Fact]
+    public async Task SequentialUpdatesAndEtagMismatchIsThrown()
+    {
+        var key = "What-Comes-First";
+        var seedValue = "Chicken";
+        var tenantId = "101";
+
+        await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+
+        var updatedValue = "Egg";
+        var modifiedEtag = $"{etag}-is-now-mismatched";
+
+        var success = await _daprClient.TrySaveStateAsync<string>("pluggable-postgres", key, updatedValue, modifiedEtag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+       
+        Assert.False(success);
+    }
+
+    [Fact]
+    public async Task SequentialUpdatesCantUseOldEtags()
+    {
+        var key = "What-Comes-First";
+        var seedValue = "Chicken";
+        var tenantId = "101";
+
+        await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+
+        var updatedValue = "Egg";
+        await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, updatedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var secondGet = await _daprClient.GetStateAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+  
+        updatedValue = "Goose";
+        var success = await _daprClient.TrySaveStateAsync<string>("pluggable-postgres", key, updatedValue, etag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var thirdGet = await _daprClient.GetStateAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+  
+        Assert.Multiple(
+            () => Assert.False(success),
+            () => Assert.Equal(secondGet, thirdGet)
+        );
+    }
+
     public async Task ScanEntireDatabaseForStateBleedAcrossTenants()
     {
         // TODO : Write a SQL query that scans through all tables in all schemas,
