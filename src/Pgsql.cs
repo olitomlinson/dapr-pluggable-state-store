@@ -216,10 +216,9 @@ namespace Helpers
                     THEN
                         DELETE FROM {SchemaAndTable}
                         WHERE 
-                            key = '{key}'
+                            key = '{key}';
                     END IF;
-                END
-                $$;";
+                END $$;";
 
                 _logger.LogDebug($"({correlationId}) Etag not present - DeleteRowAsync: key: [{key}], sql: [{sql}]");
 
@@ -248,8 +247,7 @@ namespace Helpers
                             AND
                             etag = '{etag}';
                     END IF;
-                END
-                $$;";
+                END $$;";
 
                 _logger.LogDebug($"({correlationId}) Etag not present - DeleteRowAsync: key: [{key}], etag: [{etag}], sql: [{sql}]");
 

@@ -15,7 +15,7 @@ services:
   pluggableapp:
     build:
       context: .
-      dockerfile: Component/Dockerfile
+      dockerfile: Dockerfile
     ports:
       - "3500:3500"
     networks:

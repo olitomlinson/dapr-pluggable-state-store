@@ -144,6 +144,26 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         );
     }
 
+     [Fact]
+    public async Task DeleteWithoutEtag()
+    {
+        var key = "What-Comes-First";
+        var seedValue = "Chicken";
+        var tenantId = "102";
+
+        await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var firstGet = await _daprClient.GetStateAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+
+        await _daprClient.DeleteStateAsync("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var secondGet = await _daprClient.GetStateAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+
+
+        Assert.Multiple(
+            () => Assert.Equal(seedValue, firstGet),
+            () => Assert.Null(secondGet)
+        );
+    }
+
     public async Task ScanEntireDatabaseForStateBleedAcrossTenants()
     {
         // TODO : Write a SQL query that scans through all tables in all schemas,
