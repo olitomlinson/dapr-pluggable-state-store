@@ -231,6 +231,11 @@ namespace Helpers
             }
             else
             {
+
+                // this method incorrectly reports the rows affected as always -1. 
+                // This is due to the code executing as an anonymous block.
+                // This needs changing from an anonymous block to a real named function,
+                // so that return value can be used to return ROW_COUNT;
                 var sql = @$"
                 DO $$
                 BEGIN 
@@ -246,10 +251,12 @@ namespace Helpers
                             key = '{key}'
                             AND
                             etag = '{etag}';
+                            --GET DIAGNOSTICS del_count = ROW_COUNT;
+                            --RETURN count;
                     END IF;
                 END $$;";
 
-                _logger.LogDebug($"({correlationId}) Etag not present - DeleteRowAsync: key: [{key}], etag: [{etag}], sql: [{sql}]");
+                _logger.LogDebug($"({correlationId}) Etag present - DeleteRowAsync: key: [{key}], etag: [{etag}], sql: [{sql}]");
 
                 await using (var cmd = new NpgsqlCommand(sql, _connection, transaction))
                 {
@@ -258,7 +265,7 @@ namespace Helpers
                 }
             }
 
-            if (rowsDeleted == 0 && !string.IsNullOrEmpty(etag))
+            if (rowsDeleted < 0 && !string.IsNullOrEmpty(etag))
             {
                 _logger.LogDebug($"({correlationId}) Etag present but no rows deleted, throwing EtagMismatchException");
                 throw new Dapr.PluggableComponents.Components.StateStore.ETagMismatchException();

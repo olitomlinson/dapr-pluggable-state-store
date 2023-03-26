@@ -113,9 +113,9 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
         var updatedValue = "Egg";
-        var modifiedEtag = $"{etag}-is-now-mismatched";
+        var wrongEtag = $"{etag}-is-now-mismatched";
 
-        var success = await _daprClient.TrySaveStateAsync<string>("pluggable-postgres", key, updatedValue, modifiedEtag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var success = await _daprClient.TrySaveStateAsync<string>("pluggable-postgres", key, updatedValue, wrongEtag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
        
         Assert.False(success);
     }
@@ -157,10 +157,47 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         await _daprClient.DeleteStateAsync("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
         var secondGet = await _daprClient.GetStateAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
-
         Assert.Multiple(
             () => Assert.Equal(seedValue, firstGet),
             () => Assert.Null(secondGet)
+        );
+    }
+
+    [Fact]
+    public async Task DeleteWithEtag()
+    {
+        var key = "What-Comes-First";
+        var seedValue = "Chicken";
+        var tenantId = "103";
+
+        await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+
+        var success = await _daprClient.TryDeleteStateAsync("pluggable-postgres", key, etag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var secondGet = await _daprClient.GetStateAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+
+        Assert.Multiple(
+            () => Assert.True(success),
+            () => Assert.Null(secondGet)
+        );
+    }
+
+    [Fact]
+    public async Task DeleteWithWrongEtagDoesNotDelete()
+    {
+        var key = "What-Comes-First";
+        var seedValue = "Chicken";
+        var tenantId = "105";
+
+        await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+
+        var wrongEtag = $"{etag}-is-now-mismatched";
+        var success = await _daprClient.TryDeleteStateAsync("pluggable-postgres", key, wrongEtag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+       
+        Assert.Multiple(
+            () => Assert.Equal(seedValue, firstGet),
+            () => Assert.False(success)
         );
     }
 
