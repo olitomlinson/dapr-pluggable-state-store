@@ -12,7 +12,7 @@ This component is specialised with tenant-aware state operations, such as 'Schem
 
 ### Working capabilities
 
-- Standard state store behaviors (BulkSet, Get, Delete)
+- Standard state store behaviors (`Set`, `Get`, `Delete`)
 - Transactional API
 - Etags
 
@@ -22,7 +22,10 @@ Tenant-aware state operations requires a client to specify a `tenantId` as part 
 
 ### To do
 
-- Properly utilise JSONP in `value` db field
+- Implement a native `BulkGet` and `BulkSet`
+- Support `IsBinary` (Properly utilise JSONP in `value` col)
+- Look again at `XMIN` for Etag (eww)
+- Review Indexes (particulary around `key` and `etag`)
 
 ### Won't do
 
