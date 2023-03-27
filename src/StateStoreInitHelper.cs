@@ -103,15 +103,26 @@ namespace Helpers
 
         private string GetConnectionString(IReadOnlyDictionary<string,string> properties){
             if (!properties.TryGetValue(CONNECTION_STRING_KEYWORD, out string connectionString))
-                throw new ArgumentException($"Mandatory component metadata property '{CONNECTION_STRING_KEYWORD}' is not set");
+                throw new StateStoreInitHelperException($"Missing connection string - 'metadata.{CONNECTION_STRING_KEYWORD} is a mandatory property'");
             return connectionString;
         }
 
         private string GetTenantIdFromMetadata(IReadOnlyDictionary<string, string> operationMetadata){
             operationMetadata.TryGetValue("tenantId", out string tenantId);   
             if (String.IsNullOrEmpty(tenantId))
-                throw new ArgumentException("'metadata.tenantId' value is not specified");
+                throw new StateStoreInitHelperException("Missing Tenant Id - 'metadata.tenantId' is a mandatory property");
             return tenantId;
         }
+    }
+
+    [System.Serializable]
+    public class StateStoreInitHelperException : System.Exception
+    {
+        public StateStoreInitHelperException() { }
+        public StateStoreInitHelperException(string message) : base(message) { }
+        public StateStoreInitHelperException(string message, System.Exception inner) : base(message, inner) { }
+        protected StateStoreInitHelperException(
+            System.Runtime.Serialization.SerializationInfo info,
+            System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
     }
 }

@@ -33,14 +33,62 @@ namespace Helpers
             var sql = 
                 @$"CREATE SCHEMA IF NOT EXISTS {_SafeSchema} 
                 AUTHORIZATION postgres;
-                CREATE EXTENSION IF NOT EXISTS ""uuid-ossp"";";
+                CREATE EXTENSION IF NOT EXISTS ""uuid-ossp"";
+                
+                CREATE OR REPLACE FUNCTION {_SafeSchema}.delete_key_with_etag_v1(
+                    tbl regclass,
+                    keyvalue text,
+                    etagvalue text,
+                    OUT success boolean)
+                    RETURNS boolean
+                    LANGUAGE 'plpgsql'
+                    COST 100
+                    VOLATILE PARALLEL UNSAFE
+                AS $BODY$     
+                BEGIN
+                EXECUTE format('
+                    DELETE FROM %s
+                    WHERE  key = $1 AND etag = $2
+                    RETURNING TRUE', tbl)
+                USING   keyvalue, etagvalue
+                INTO    success;
+                RETURN;  -- optional in this case
+                END
+                $BODY$;
+
+                ALTER FUNCTION {_SafeSchema}.delete_key_with_etag_v1(regclass, text, text)
+                    OWNER TO postgres;
+
+                CREATE OR REPLACE FUNCTION {_SafeSchema}.delete_key_v1(
+                    tbl regclass,
+                    keyvalue text,
+                    OUT success boolean)
+                    RETURNS boolean
+                    LANGUAGE 'plpgsql'
+                    COST 100
+                    VOLATILE PARALLEL UNSAFE
+                AS $BODY$     
+                BEGIN
+                EXECUTE format('
+                    DELETE FROM %s
+                    WHERE  key = $1
+                    RETURNING TRUE', tbl)
+                USING   keyvalue
+                INTO    success;
+                RETURN;  -- optional in this case
+                END
+                $BODY$;
+
+                ALTER FUNCTION {_SafeSchema}.delete_key_v1(regclass, text)
+                    OWNER TO postgres;
+                ";
             
-            _logger.LogDebug($"CreateSchemaAsync - {sql}");
+            _logger.LogDebug($"{nameof(CreateSchemaIfNotExistsAsync)} - {sql}");
             
             await using (var cmd = new NpgsqlCommand(sql, _connection, transaction))
             await cmd.ExecuteNonQueryAsync();
 
-            _logger.LogDebug($"Schema Created : [{_SafeSchema}]");
+            _logger.LogDebug($"{nameof(CreateSchemaIfNotExistsAsync)} - Schema Created : {_SafeSchema}");
         }
         
         public async Task CreateTableIfNotExistsAsync(NpgsqlTransaction transaction = null)
@@ -57,12 +105,12 @@ namespace Helpers
                 TABLESPACE pg_default; 
                 ALTER TABLE IF EXISTS {SchemaAndTable} OWNER to postgres;";
 
-            _logger.LogDebug($"CreateTableAsync - {sql}");
+            _logger.LogDebug($"{nameof(CreateTableIfNotExistsAsync)} - SQL : [{sql}]");
 
             await using (var cmd = new NpgsqlCommand(sql, _connection, transaction))
             await cmd.ExecuteNonQueryAsync();
 
-            _logger.LogDebug($"Table Created : [{SchemaAndTable}]");
+            _logger.LogDebug($"{nameof(CreateTableIfNotExistsAsync)} - Table Created : {SchemaAndTable}");
         }
 
 
@@ -93,7 +141,7 @@ namespace Helpers
                 WHERE 
                     key = (@key)";
 
-            _logger.LogInformation($"GetAsync:  key: [{key}], value: [{value}], sql: [{sql}]");
+            _logger.LogInformation($"{nameof(GetAsync)} - key: [{key}], value: [{value}], sql: [{sql}]");
 
             await using (var cmd = new NpgsqlCommand(sql, _connection, transaction))
             {
@@ -103,7 +151,7 @@ namespace Helpers
                 {
                     value = reader.GetString(1);
                     etag = reader.GetString(2);
-                    _logger.LogDebug("key: {0}, value: {1}, etag : {2}", reader.GetString(0), value, etag);
+                    _logger.LogDebug($"{nameof(GetAsync)} - Result - key: {reader.GetString(0)}, value: {value}, etag : {etag}");
                     return new Tuple<string,string>(value, etag);
                 }
             }
@@ -112,14 +160,12 @@ namespace Helpers
 
         public async Task UpsertAsync(string key, string value, string etag, NpgsqlTransaction transaction = null)
         {
-    
-            // this is an optimisation, which I will probably remove when I eventually support First-Write-Wins.
-            if (string.IsNullOrEmpty(etag))
-            {
-                await CreateSchemaIfNotExistsAsync(transaction); 
-                await CreateTableIfNotExistsAsync(transaction); 
-            }
+            // Need to find a way to optimise this so we don't always call :
+            // - CreateSchemaIfNotExistsAsync
+            // - CreateTableIfNotExistsAsync
 
+            await CreateSchemaIfNotExistsAsync(transaction); 
+            await CreateTableIfNotExistsAsync(transaction);  
             await InsertOrUpdateAsync(key, value, etag, transaction);
         }
 
@@ -150,7 +196,7 @@ namespace Helpers
                     ,updatedate = NOW()
                 ;";
 
-                _logger.LogDebug($"({correlationId}) Etag not present - InsertOrUpdateAsync : key: [{key}], value: [{value}], sql: [{query}]");
+                _logger.LogDebug($"{nameof(InsertOrUpdateAsync)} ({correlationId}) - Etag not present - key: [{key}], value: [{value}], sql: [{query}]");
 
                 await using (var cmd = new NpgsqlCommand(query, _connection, transaction))
                 {
@@ -158,7 +204,7 @@ namespace Helpers
                     cmd.Parameters.AddWithValue("2", NpgsqlTypes.NpgsqlDbType.Jsonb, value);
 
                     rowsAffected = await cmd.ExecuteNonQueryAsync();
-                    _logger.LogDebug($"({correlationId}) {rowsAffected} Row inserted/updated");
+                    _logger.LogDebug($"{nameof(InsertOrUpdateAsync)} ({correlationId}) - Row inserted/updated: {rowsAffected} ");
                 }
             }
             else
@@ -175,7 +221,7 @@ namespace Helpers
                     etag = (@3)
                 ;";
                 
-                _logger.LogDebug($"({correlationId}) Etag present - InsertOrUpdateAsync : key: [{key}], value: [{value}], etag: [{etag}], sql: [{query}]");
+                _logger.LogDebug($"{nameof(InsertOrUpdateAsync)} ({correlationId}) - Etag present - key: [{key}], value: [{value}], etag: [{etag}], sql: [{query}]");
 
                 await using (var cmd = new NpgsqlCommand(query, _connection, transaction))
                 {
@@ -184,91 +230,39 @@ namespace Helpers
                     cmd.Parameters.AddWithValue("3", NpgsqlTypes.NpgsqlDbType.Text, etag);
 
                     rowsAffected = await cmd.ExecuteNonQueryAsync();
-                    _logger.LogDebug($"({correlationId}) {rowsAffected} Row updated");
+                    _logger.LogDebug($"{nameof(InsertOrUpdateAsync)} ({correlationId}) - Row updated: {rowsAffected}");
                 }
             }
 
-             if (rowsAffected == 0 && !string.IsNullOrEmpty(etag))
-             {
-                _logger.LogDebug($"({correlationId}) Etag present but no rows modified, throwing EtagMismatchException");
+            if (rowsAffected == 0 && !string.IsNullOrEmpty(etag))
+            {
+                _logger.LogDebug($"{nameof(InsertOrUpdateAsync)} ({correlationId}) - Etag present but no rows modified, throwing EtagMismatchException");
                 throw new Dapr.PluggableComponents.Components.StateStore.ETagMismatchException();
-             }
+            }
         }
 
-        public async Task DeleteRowAsync(string key, string etag, NpgsqlTransaction transaction = null)
-        {
-            // TODO this is vulenerable to sql-injection as-is, need to try converting to a proc because
-            // you can't use parameters in code blocks like below.
-            var correlationId = Guid.NewGuid().ToString("N").Substring(23);   
-            var rowsDeleted = 0;
-
+        public async Task DeleteAsync(string key, string etag, NpgsqlTransaction transaction = null)
+        {      
+            var sql = "";
             if (string.IsNullOrEmpty(etag))
-            {
-                var sql = @$"
-                DO $$
-                BEGIN 
-                    IF EXISTS
-                        ( SELECT 1
-                        FROM   information_schema.tables 
-                        WHERE  table_schema = '{_schema}'
-                        AND    table_name = '{_table}'
-                        )
-                    THEN
-                        DELETE FROM {SchemaAndTable}
-                        WHERE 
-                            key = '{key}';
-                    END IF;
-                END $$;";
-
-                _logger.LogDebug($"({correlationId}) Etag not present - DeleteRowAsync: key: [{key}], sql: [{sql}]");
-
-                await using (var cmd = new NpgsqlCommand(sql, _connection, transaction))
-                {
-                    rowsDeleted = await cmd.ExecuteNonQueryAsync();
-                    _logger.LogDebug($"({correlationId}) {rowsDeleted} Row/s deleted");
-                }
-
-            }
+                sql = $"SELECT * FROM {_schema}.delete_key_v1(tbl := '{_table}', keyvalue := '{key}')";
             else
+                sql = $"SELECT * FROM {_schema}.delete_key_with_etag_v1(tbl := '{_table}', keyvalue := '{key}', etagvalue := '{etag}')";
+            _logger.LogDebug($"{nameof(DeleteAsync)} - Sql : [{sql}]");
+
+            using (var cmd = new NpgsqlCommand(sql, _connection, transaction))
             {
+                cmd.Parameters.Add(new NpgsqlParameter("success", System.Data.DbType.Boolean) { Direction = System.Data.ParameterDirection.Output });
+                var result = await cmd.ExecuteScalarAsync();
 
-                // this method incorrectly reports the rows affected as always -1. 
-                // This is due to the code executing as an anonymous block.
-                // This needs changing from an anonymous block to a real named function,
-                // so that return value can be used to return ROW_COUNT;
-                var sql = @$"
-                DO $$
-                BEGIN 
-                    IF EXISTS
-                        ( SELECT 1
-                        FROM   information_schema.tables 
-                        WHERE  table_schema = '{_schema}'
-                        AND    table_name = '{_table}'
-                        )
-                    THEN
-                        DELETE FROM {SchemaAndTable}
-                        WHERE 
-                            key = '{key}'
-                            AND
-                            etag = '{etag}';
-                            --GET DIAGNOSTICS del_count = ROW_COUNT;
-                            --RETURN count;
-                    END IF;
-                END $$;";
-
-                _logger.LogDebug($"({correlationId}) Etag present - DeleteRowAsync: key: [{key}], etag: [{etag}], sql: [{sql}]");
-
-                await using (var cmd = new NpgsqlCommand(sql, _connection, transaction))
-                {
-                    rowsDeleted = await cmd.ExecuteNonQueryAsync();
-                    _logger.LogDebug($"({correlationId}) {rowsDeleted} Row/s deleted");
+                if (!string.IsNullOrEmpty(etag) && result is System.DBNull){
+                    _logger.LogDebug($"{nameof(DeleteAsync)} - Etag present but no rows deleted, throwing EtagMismatchException");
+                    throw new Dapr.PluggableComponents.Components.StateStore.ETagMismatchException();
                 }
-            }
-
-            if (rowsDeleted < 0 && !string.IsNullOrEmpty(etag))
-            {
-                _logger.LogDebug($"({correlationId}) Etag present but no rows deleted, throwing EtagMismatchException");
-                throw new Dapr.PluggableComponents.Components.StateStore.ETagMismatchException();
+                else if (result is System.DBNull)
+                    _logger.LogDebug($"{nameof(DeleteAsync)} - Result : DBnull");
+                else if (result is true)
+                    _logger.LogDebug($"{nameof(DeleteAsync)} - Result : {(bool)result}");
             }
         }
     }
@@ -278,5 +272,9 @@ namespace Helpers
 public static class PostgresExtensions{
     public static bool TableDoesNotExist(this PostgresException ex){
         return (ex.SqlState == "42P01");
+    }
+
+    public static bool FunctionDoesNotExist( this PostgresException ex){
+        return (ex.SqlState == "42883");
     }
 }

@@ -25,7 +25,7 @@ public class ErrorHandlingTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException),
+    [ExpectedException(typeof(StateStoreInitHelperException),
     "Mandatory component metadata property 'connectionString' is not set")]
     public async Task ConnectionStringIsNotSpecified()
     {
@@ -37,7 +37,7 @@ public class ErrorHandlingTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException),
+    [ExpectedException(typeof(StateStoreInitHelperException),
     "'metadata.tenantId' value is not specified")]
     public async Task RequestFailsWhenNoTenantIdIsSpecified()
     {

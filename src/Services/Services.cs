@@ -35,7 +35,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
 
     public async Task DeleteAsync(StateStoreDeleteRequest request, CancellationToken cancellationToken = default)
     {
-         _logger.LogInformation("Delete");
+         _logger.LogInformation($"{nameof(DeleteAsync)}");
         
         (var dbfactory, var conn) = await _stateStoreInitHelper.GetDbFactory(_logger);
         using (conn)
@@ -43,27 +43,28 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
             var tran = await conn.BeginTransactionAsync();
             try 
             {
-                await dbfactory(request.Metadata).DeleteRowAsync(request.Key, request.ETag ?? String.Empty, tran);
+                await dbfactory(request.Metadata).DeleteAsync(request.Key, request.ETag ?? String.Empty, tran);
             }
             catch(Exception ex)
             {   
                 await tran.RollbackAsync();
-
-                throw ex;
+                _logger.LogDebug($"{nameof(DeleteAsync)} - rolled back transaction");
+                throw;
             }
             await tran.CommitAsync();
+            _logger.LogDebug($"{nameof(DeleteAsync)} - transaction commited");
         }
         return;
     }
 
-    private async Task ThrowMissingTenantIdException()
+    private static async Task ThrowGrpcException(string message)
     {
         var badRequest = new BadRequest();
-        var des = "A tenant Id must be provided via metadata";
+        var des = message;
         badRequest.FieldViolations.Add(    
         new Google.Rpc.BadRequest.Types.FieldViolation
             {        
-                Field = "metadata.tenantId",
+                Field = message,
                 Description = des
             });
 
@@ -76,12 +77,12 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
 
         var metadata = new Metadata();
         metadata.Add("grpc-status-details-bin", status.ToByteArray());
-        throw new RpcException(new Grpc.Core.Status(baseStatusCode, "fake-err-msg"), metadata);
+        throw new RpcException(new Grpc.Core.Status(baseStatusCode, message), metadata);
     }
 
     public async Task<StateStoreGetResponse?> GetAsync(StateStoreGetRequest request, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Get");
+        _logger.LogInformation($"{nameof(GetAsync)}");
 
         string value = "";
         string etag = "";
@@ -101,14 +102,14 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
             {
                 notFound = true;
             }
-            catch(ArgumentException ex)
+            catch(StateStoreInitHelperException ex) when (ex.Message.StartsWith("Missing Tenant Id"))
             {
-                await ThrowMissingTenantIdException();
+                await ThrowGrpcException(ex.Message);
             }
 
             if (notFound)
             {
-                _logger.LogDebug($"Object not found with key : [{request.Key}]");
+                _logger.LogDebug($"{nameof(GetAsync)} - State not found with key : [{request.Key}]");
                 return new StateStoreGetResponse();
             } 
         }
@@ -122,7 +123,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
 
     public async Task<string[]> GetFeaturesAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Features");
+        _logger.LogInformation($"{nameof(GetFeaturesAsync)}");
 
         string[] response = { "ETAG", "TRANSACTIONAL" };
         return response;
@@ -130,7 +131,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
 
     public async Task InitAsync(MetadataRequest request, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Init");
+        _logger.LogInformation($"{nameof(InitAsync)}");
 
         await _stateStoreInitHelper.InitAsync(request.Properties);
 
@@ -139,13 +140,13 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
 
     public async Task PingAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Ping");
+        _logger.LogInformation($"{nameof(PingAsync)}");
         return;
     }
 
     public async Task SetAsync(StateStoreSetRequest request, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation($"Set");
+        _logger.LogInformation($"{nameof(SetAsync)}");
                 
         (var dbfactory, var conn) = await _stateStoreInitHelper.GetDbFactory(_logger);
         using (conn)
@@ -157,17 +158,16 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
                 // but I do not know what this is trying to achieve. See existing pgSQL built-in component 
                 // https://github.com/dapr/components-contrib/blob/d3662118105a1d8926f0d7b598c8b19cd9dc1ccf/state/postgresql/postgresdbaccess.go#L135
                 
-                var value = System.Text.Encoding.UTF8.GetString(request.Value.Span);
                 tran = await conn.BeginTransactionAsync();
+                var value = System.Text.Encoding.UTF8.GetString(request.Value.Span);
                 await dbfactory(request.Metadata).UpsertAsync(request.Key, value, request.ETag ?? String.Empty, tran);   
-                await tran.CommitAsync();        
-                
+                await tran.CommitAsync();
             }
             catch(Exception ex)
             {
                 await tran.RollbackAsync();
-
-                throw ex;
+                _logger.LogError(ex, $"{nameof(SetAsync)} - Rollback");
+                throw;
             }
         }   
         return;
@@ -176,7 +176,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
     public async Task TransactAsync(StateStoreTransactRequest request, CancellationToken cancellationToken = default)
     {
 
-        _logger.LogInformation("Transaction - Set/Delete");
+        _logger.LogInformation($"{nameof(TransactAsync)} - Set/Delete");
 
         if (!request.Operations.Any())
             return;
@@ -192,7 +192,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
                     await op.Visit(
                         onDeleteRequest: async (x) => {
                             var db = dbfactory(x.Metadata);
-                            await db.DeleteRowAsync(x.Key, x.ETag ?? String.Empty, tran);
+                            await db.DeleteAsync(x.Key, x.ETag ?? String.Empty, tran);
                         },
                         onSetRequest: async (x) => {     
                             var db = dbfactory(x.Metadata);
@@ -210,13 +210,8 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
             catch(Exception ex)
             {
                 await tran.RollbackAsync();
-
-                if (ex.Message == "Etag mismatch")
-                    _logger.LogInformation("Etag mismatch");
-                else
-                    _logger.LogError(ex, "State object could not be deleted");
-
-                throw ex;
+                _logger.LogError(ex, $"{nameof(TransactAsync)} - Rollback");
+                throw;
             } 
         }
     }

@@ -149,7 +149,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
     {
         var key = "What-Comes-First";
         var seedValue = "Chicken";
-        var tenantId = "102";
+        var tenantId = "1023";
 
         await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
         var firstGet = await _daprClient.GetStateAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
