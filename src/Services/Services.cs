@@ -11,7 +11,6 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-// Uncomment to import Dapr proto components namespace.
 using Google.Protobuf;
 using Grpc.Core;
 using Helpers;

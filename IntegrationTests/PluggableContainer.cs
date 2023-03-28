@@ -22,7 +22,7 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
 
     private readonly ushort _dapr_http_port = 3501;
     private readonly ushort _dapr_grpc_port = 50002;
-
+    private DaprClient _daprClient;
     private string _dapr_app_id;
 
     public PluggableContainer() : base(new HttpClientHandler())
@@ -39,6 +39,7 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
         _postgresContainer = new PostgreSqlBuilder()
             .WithNetwork(_network)
             .WithName($"postgres-{containerSuffix}")
+            .WithCommand("-c", "log_statement=all")
             .WithNetworkAliases("db")
             .Build();
 
@@ -82,6 +83,10 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
         await _pluggableContainer.StartAsync().ConfigureAwait(false);
         await _postgresContainer.StartAsync().ConfigureAwait(false);
         await _daprContainer.StartAsync().ConfigureAwait(false);
+
+        Environment.SetEnvironmentVariable("DAPR_HTTP_PORT", _daprContainer.GetMappedPublicPort(_dapr_http_port).ToString());
+        Environment.SetEnvironmentVariable("DAPR_GRPC_PORT", _daprContainer.GetMappedPublicPort(_dapr_grpc_port).ToString());
+        _daprClient = new DaprClientBuilder().Build();
     }
 
     public async Task DisposeAsync()
@@ -112,8 +117,6 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
     }
 
     public DaprClient GetDaprClient(){
-        Environment.SetEnvironmentVariable("DAPR_HTTP_PORT", _daprContainer.GetMappedPublicPort(_dapr_http_port).ToString());
-        Environment.SetEnvironmentVariable("DAPR_GRPC_PORT", _daprContainer.GetMappedPublicPort(_dapr_grpc_port).ToString());
-        return new DaprClientBuilder().Build();
+        return _daprClient;
     }
 }

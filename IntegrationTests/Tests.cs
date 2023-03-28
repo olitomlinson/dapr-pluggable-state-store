@@ -1,18 +1,22 @@
 ﻿using System.Net;
 using Dapr.Client;
+using Xunit.Abstractions;
 
 namespace IntegrationTests;
 
+[Collection("Sequence")]  
 public class StateIsolationTests : IClassFixture<PluggableContainer>
 {
+    private readonly ITestOutputHelper output;
     private readonly PluggableContainer _pluggableContainer;
     private readonly DaprClient _daprClient;
 
-    public StateIsolationTests(PluggableContainer pluggableContainer)
+    public StateIsolationTests(PluggableContainer pluggableContainer, ITestOutputHelper output)
     {
         _pluggableContainer = pluggableContainer;
         _daprClient = _pluggableContainer.GetDaprClient();
         _pluggableContainer.SetBaseAddress();
+        this.output = output;
     }
 
     [Fact]
@@ -34,7 +38,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
 
         var key = "Foo";
         var value = "Bar";
-        var tenantId = "123";
+        var tenantId = Guid.NewGuid().ToString();
 
         await _daprClient.SaveStateAsync("pluggable-postgres", key, value, metadata: tenantId.AsMetaData(), cancellationToken: ct);
         
@@ -50,8 +54,8 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
 
         var key = "Foo";
         var value = "Bar";
-        var tenantId = "123";
-        var illegalTenantId = "567";
+        var tenantId = Guid.NewGuid().ToString();
+        var illegalTenantId = Guid.NewGuid().ToString();
 
         await _daprClient.SaveStateAsync("pluggable-postgres", key, value, metadata: tenantId.AsMetaData(), cancellationToken: ct);
         
@@ -66,7 +70,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
     {
         var key = "What-Comes-First";
         var seedValue = "Chicken";
-        var tenantId = "101";
+        var tenantId = Guid.NewGuid().ToString();
 
         await _daprClient.SaveStateAsync("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
         var firstGet = await _daprClient.GetStateAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
@@ -86,7 +90,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
     {
         var key = "What-Comes-First";
         var seedValue = "Chicken";
-        var tenantId = "101";
+        var tenantId = Guid.NewGuid().ToString();
 
         await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
         var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
@@ -107,7 +111,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
     {
         var key = "What-Comes-First";
         var seedValue = "Chicken";
-        var tenantId = "101";
+        var tenantId = Guid.NewGuid().ToString();
 
         await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
         var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
@@ -125,7 +129,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
     {
         var key = "What-Comes-First";
         var seedValue = "Chicken";
-        var tenantId = "101";
+        var tenantId = Guid.NewGuid().ToString();
 
         await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
         var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
@@ -149,7 +153,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
     {
         var key = "What-Comes-First";
         var seedValue = "Chicken";
-        var tenantId = "1023";
+        var tenantId = Guid.NewGuid().ToString();
 
         await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
         var firstGet = await _daprClient.GetStateAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
@@ -168,7 +172,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
     {
         var key = "What-Comes-First";
         var seedValue = "Chicken";
-        var tenantId = "103";
+        var tenantId = Guid.NewGuid().ToString();
 
         await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
         var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
@@ -187,7 +191,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
     {
         var key = "What-Comes-First";
         var seedValue = "Chicken";
-        var tenantId = "105";
+        var tenantId = Guid.NewGuid().ToString();
 
         await _daprClient.SaveStateAsync<string>("pluggable-postgres", key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
         var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>("pluggable-postgres", key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
@@ -199,6 +203,69 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
             () => Assert.Equal(seedValue, firstGet),
             () => Assert.False(success)
         );
+    }
+
+    [Fact]
+    public async Task ParallelUpsertOperationsAcrossUniqueTenants()
+    {
+        IEnumerable<(string,string)> produceTestData(int upto)
+        {
+            for (int i = 0; i < upto; i ++)
+            {
+                yield return (i.ToString(), $"{i} some data to save");
+            }
+        }
+    
+        var cts = new CancellationTokenSource();
+        var options = new ParallelOptions() { MaxDegreeOfParallelism = 50, CancellationToken = cts.Token };
+        await Parallel.ForEachAsync(produceTestData(1000), options, async (input, token) =>
+        {
+            string tenantId = Guid.NewGuid().ToString();
+            var metadata = tenantId.AsMetaData();
+            await _daprClient.SaveStateAsync<string>("pluggable-postgres", input.Item1, input.Item2, metadata: metadata, cancellationToken: token);
+            var get = await _daprClient.GetStateAsync<string>("pluggable-postgres", input.Item1, metadata: metadata);
+            if (input.Item2 != get)
+                Assert.Fail("get value did not match what was persisted");
+        });
+           
+        Assert.True(true);
+    }
+
+    [Fact]
+    public async Task ParallelUpsertOperationsOnSingleTenant()
+    {
+        var tenantId = Guid.NewGuid().ToString();
+        var metadata = tenantId.AsMetaData();
+       
+        /*  PROBE
+                This is a probe to warm up the tenant, otherwise 
+                the table won't exist in some requests due to READ COMMITED transaction isolation.
+                The quick fix is to warm up the tenant before hitting it with lots of parallelism.
+                Maybe a better long term solution is to move to SERIALIZABLE isolation, but this
+                will come with a performance degredation. */
+
+        await _daprClient.SaveStateAsync<string>("pluggable-postgres", "probe", "probe", metadata: metadata);
+        await Task.Delay(500);
+
+        /*  END PROBE */
+
+        var input = new List<(string, string)>();        
+        foreach(var i in Enumerable.Range(0, 1000))
+        {
+            input.Add((i.ToString(), $"{i} some data to save"));
+        }
+    
+        var cts = new CancellationTokenSource();
+        var options = new ParallelOptions() { MaxDegreeOfParallelism = 50, CancellationToken = cts.Token };
+        await Parallel.ForEachAsync(input, options, async (input, token) =>
+        {
+            await _daprClient.SaveStateAsync<string>("pluggable-postgres", input.Item1, input.Item2, metadata: metadata, cancellationToken: token);
+            var get = await _daprClient.GetStateAsync<string>("pluggable-postgres", input.Item1, metadata: metadata);
+            if (input.Item2 != get)
+                Assert.Fail("get value did not match what was persisted");
+        });
+              
+        Assert.True(true);
     }
 
     public async Task ScanEntireDatabaseForStateBleedAcrossTenants()

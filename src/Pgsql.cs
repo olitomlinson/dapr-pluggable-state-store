@@ -1,4 +1,5 @@
 using Npgsql;
+using System.Collections.Concurrent;
 
 namespace Helpers
 {
@@ -10,6 +11,19 @@ namespace Helpers
         private readonly string _table;
         private ILogger _logger;
         private readonly NpgsqlConnection _connection;
+
+        /*  DATABASE RESOURCE LOCKS 
+                These locks are important to prevent a storm of resource creation 
+                on a highly parallel cold start. Yes, this does cause a performance 
+                degredation but this provides a more predictable & stable experience,
+                without having to run all database transactions in SERIALIZABLE isolation mode.
+                
+                Risk : The dictionaries will grow due to the unbounded nature of tenants.
+                To mitigate this, the dictionarys could potentially be replaced with MemoryCache
+                objects. (Assuming modern MemoryCache in .NET 6 is good to go)
+        */
+        static ConcurrentDictionary<string, object> _locks = new ConcurrentDictionary<string, object>();
+        static ConcurrentDictionary<string, string> _resources = new ConcurrentDictionary<string, string>();
 
         public Pgsql(string schema, string table, NpgsqlConnection connection, ILogger logger)
         {
@@ -33,7 +47,6 @@ namespace Helpers
             var sql = 
                 @$"CREATE SCHEMA IF NOT EXISTS {_SafeSchema} 
                 AUTHORIZATION postgres;
-                CREATE EXTENSION IF NOT EXISTS ""uuid-ossp"";
                 
                 CREATE OR REPLACE FUNCTION {_SafeSchema}.delete_key_with_etag_v1(
                     tbl regclass,
@@ -116,7 +129,6 @@ namespace Helpers
 
         private string Safe(string input)
         {
-            // Postgres needs any object starting with a non-alpha to be wrapped in double-qoutes
             return $"\"{input}\"";
         }
 
@@ -160,13 +172,30 @@ namespace Helpers
 
         public async Task UpsertAsync(string key, string value, string etag, NpgsqlTransaction transaction = null)
         {
-            // Need to find a way to optimise this so we don't always call :
-            // - CreateSchemaIfNotExistsAsync
-            // - CreateTableIfNotExistsAsync
-
-            await CreateSchemaIfNotExistsAsync(transaction); 
-            await CreateTableIfNotExistsAsync(transaction);  
+            EnsureDatabaseResourcesExist(transaction);
             await InsertOrUpdateAsync(key, value, etag, transaction);
+        }
+
+        private void EnsureDatabaseResourcesExist(NpgsqlTransaction transaction = null)
+        {
+            GateAccessToResourceCreation($"S:{_schema}", () => CreateSchemaIfNotExistsAsync(transaction).Wait());
+            GateAccessToResourceCreation($"T:{_table}", () => CreateTableIfNotExistsAsync(transaction).Wait());
+        }
+
+        private void GateAccessToResourceCreation(string resourceName, Action resourceFactory)
+        {
+            if (!_resources.TryGetValue(resourceName, out string _))
+            {   
+                var _lock = _locks.GetOrAdd(resourceName, (x) => { return new Object(); });
+                lock (_lock) 
+                {
+                    if (!_resources.TryGetValue(resourceName, out string _))
+                    { 
+                        resourceFactory();
+                        _resources.TryAdd(resourceName, DateTime.UtcNow.ToString());
+                    }
+                }
+            }
         }
 
         public async Task InsertOrUpdateAsync(string key, string value, string etag, NpgsqlTransaction transaction = null)
@@ -186,13 +215,13 @@ namespace Helpers
                 (
                     @1 
                     ,@2
-                    ,uuid_generate_v4()::text
+                    ,gen_random_uuid()::text
                 )
                 ON CONFLICT (key)
                 DO
                 UPDATE SET 
                     value = @2
-                    ,etag = uuid_generate_v4()::text
+                    ,etag = gen_random_uuid()::text
                     ,updatedate = NOW()
                 ;";
 
@@ -214,7 +243,7 @@ namespace Helpers
                 SET 
                     value = @2
                     ,updatedate = NOW()
-                    ,etag = uuid_generate_v4()::text
+                    ,etag = gen_random_uuid()::text
                 WHERE 
                     key = (@1)
                     AND 
