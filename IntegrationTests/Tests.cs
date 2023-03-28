@@ -1,5 +1,4 @@
-﻿using System.Net;
-using Dapr.Client;
+﻿using Dapr.Client;
 using Xunit.Abstractions;
 
 namespace IntegrationTests;
@@ -15,20 +14,14 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
     {
         _pluggableContainer = pluggableContainer;
         _daprClient = _pluggableContainer.GetDaprClient();
-        _pluggableContainer.SetBaseAddress();
         this.output = output;
     }
 
     [Fact]
-    public async Task DaprHealthCheck()
+    public async Task CheckDaprSideCarIsHealthy()
     {
-        const string path = "/v1.0/healthz";
-
-        var response = await _pluggableContainer.GetAsync(path)
-        .ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var healthy = await _daprClient.CheckHealthAsync();
+        Assert.True(healthy);
     }
 
     [Fact]

@@ -5,13 +5,12 @@ using DotNet.Testcontainers.Networks;
 using DotNet.Testcontainers.Volumes;
 using Testcontainers.PostgreSql;
 using JetBrains.Annotations;
-using System.Text.Json.Serialization;
 using Dapr.Client;
 
 namespace IntegrationTests;
 
 [UsedImplicitly]
-public sealed class PluggableContainer : HttpClient, IAsyncLifetime
+public sealed class PluggableContainer : IAsyncLifetime
 {
     private static readonly PluggableImage Image = new();
     private readonly IVolume _socketVolume;
@@ -25,7 +24,7 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
     private DaprClient _daprClient;
     private string _dapr_app_id;
 
-    public PluggableContainer() : base(new HttpClientHandler())
+    public PluggableContainer()
     {
         var daprComponentsDirectory = $"{Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)}/DaprComponents";
 
@@ -97,19 +96,6 @@ public sealed class PluggableContainer : HttpClient, IAsyncLifetime
         await _daprContainer.DisposeAsync().ConfigureAwait(false);
         await _network.DeleteAsync().ConfigureAwait(false);
         await _socketVolume.DeleteAsync().ConfigureAwait(false);
-    }
-
-    public void SetBaseAddress()
-    {
-        try
-        {
-            var uriBuilder = new UriBuilder("http", _daprContainer.Hostname, _daprContainer.GetMappedPublicPort(_dapr_http_port));
-            BaseAddress = uriBuilder.Uri;
-        }
-        catch
-        {
-            // Set the base address only once.
-        }
     }
 
     public async Task<ExecResult> GetStateViaSQL(string key, string tenantId){
