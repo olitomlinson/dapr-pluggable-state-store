@@ -278,7 +278,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         );
     }
 
-    // [Fact]
+    [Fact]
     public async Task ParallelUpsertOperationsAcrossUniqueTenants()
     {
 
@@ -306,7 +306,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         Assert.True(true);
     }
 
-    // [Fact]
+    [Fact]
     public async Task ParallelUpsertOperationsOnSingleTenant()
     {
         var tenantId = Guid.NewGuid().ToString();
