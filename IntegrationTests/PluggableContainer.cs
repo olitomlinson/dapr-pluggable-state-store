@@ -18,7 +18,6 @@ public sealed class PluggableContainer : IAsyncLifetime
     private readonly IContainer _postgresContainer;
     private readonly IContainer _pluggableContainer;
     private readonly IContainer _daprContainer;
-
     private readonly ushort _dapr_http_port = 3501;
     private readonly ushort _dapr_grpc_port = 50002;
     private DaprClient _daprClient;

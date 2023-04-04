@@ -51,7 +51,7 @@ namespace Helpers
                 CREATE OR REPLACE FUNCTION {_SafeSchema}.delete_key_with_etag_v1(
                     tbl regclass,
                     keyvalue text,
-                    etagvalue text,
+                    etagvalue xid,
                     OUT success boolean)
                     RETURNS boolean
                     LANGUAGE 'plpgsql'
@@ -61,7 +61,7 @@ namespace Helpers
                 BEGIN
                 EXECUTE format('
                     DELETE FROM %s
-                    WHERE  key = $1 AND etag = $2
+                    WHERE  key = $1 AND xmin = $2
                     RETURNING TRUE', tbl)
                 USING   keyvalue, etagvalue
                 INTO    success;
@@ -69,7 +69,7 @@ namespace Helpers
                 END
                 $BODY$;
 
-                ALTER FUNCTION {_SafeSchema}.delete_key_with_etag_v1(regclass, text, text)
+                ALTER FUNCTION {_SafeSchema}.delete_key_with_etag_v1(regclass, text, xid)
                     OWNER TO postgres;
 
                 CREATE OR REPLACE FUNCTION {_SafeSchema}.delete_key_v1(
@@ -111,7 +111,6 @@ namespace Helpers
                 ( 
                     key text NOT NULL PRIMARY KEY COLLATE pg_catalog.""default"" 
                     ,value text
-                    ,etag text
                     ,insertdate TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
                     ,updatedate TIMESTAMP WITH TIME ZONE NULL
                 ) 
@@ -147,8 +146,7 @@ namespace Helpers
                 @$"SELECT 
                     key
                     ,value
-                    ,etag
-                    
+                    ,xmin::text
                 FROM {SchemaAndTable} 
                 WHERE 
                     key = (@key)";
@@ -209,19 +207,16 @@ namespace Helpers
                 (
                     key
                     ,value
-                    ,etag
                 ) 
                 VALUES 
                 (
                     @1 
                     ,@2
-                    ,gen_random_uuid()::text
                 )
                 ON CONFLICT (key)
                 DO
                 UPDATE SET 
                     value = @2
-                    ,etag = gen_random_uuid()::text
                     ,updatedate = NOW()
                 ;";
 
@@ -238,16 +233,25 @@ namespace Helpers
             }
             else
             {
+                uint etagi = 0;
+                try 
+                { 
+                    etagi = Convert.ToUInt32(etag,10); 
+                }
+                catch(Exception ex)
+                {
+                    throw new Dapr.PluggableComponents.Components.StateStore.ETagInvalidException();
+                }
+
                 var query = @$"
                 UPDATE {SchemaAndTable} 
                 SET 
                     value = @2
                     ,updatedate = NOW()
-                    ,etag = gen_random_uuid()::text
                 WHERE 
                     key = (@1)
                     AND 
-                    etag = (@3)
+                    xmin = (@3)
                 ;";
                 
                 _logger.LogDebug($"{nameof(InsertOrUpdateAsync)} ({correlationId}) - Etag present - key: [{key}], value: [{value}], etag: [{etag}], sql: [{query}]");
@@ -256,7 +260,7 @@ namespace Helpers
                 {
                     cmd.Parameters.AddWithValue("1", NpgsqlTypes.NpgsqlDbType.Text, key);
                     cmd.Parameters.AddWithValue("2", NpgsqlTypes.NpgsqlDbType.Jsonb, value);
-                    cmd.Parameters.AddWithValue("3", NpgsqlTypes.NpgsqlDbType.Text, etag);
+                    cmd.Parameters.AddWithValue("3", NpgsqlTypes.NpgsqlDbType.Xid, etagi);
 
                     rowsAffected = await cmd.ExecuteNonQueryAsync();
                     _logger.LogDebug($"{nameof(InsertOrUpdateAsync)} ({correlationId}) - Row updated: {rowsAffected}");

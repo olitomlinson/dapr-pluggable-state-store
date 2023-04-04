@@ -24,7 +24,7 @@ Tenant-aware state operations requires a client to specify a `tenantId` as part 
 
 - Implement a native `BulkGet` and `BulkSet`
 - Support `IsBinary` (Properly utilise JSONP in `value` col)
-- Look again at `XMIN` for Etag (eww)
+- ~~Look again at `XMIN` for Etag~~
 - Review Indexes (particulary around `key` and `etag`)
 
 ### Won't do
