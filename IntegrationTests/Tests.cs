@@ -179,7 +179,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         Assert.False(success);
     }
 
-    [Fact(Skip = "throws a daprException which is likely wrong behaviour")]
+    [Fact]
     public async Task SequentialUpdatesAndEtagInvalidIsThrown()
     {
         var key = GetRandomKey();
@@ -192,9 +192,8 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         var updatedValue = "Egg";
         var wrongEtag = $"not-a-valid-etag";
 
-        var success = await _daprClient.TrySaveStateAsync<string>(_stateStore, key, updatedValue, wrongEtag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-
-        Assert.False(success);
+        await Assert.ThrowsAsync<Dapr.DaprException>(async () => { 
+            await _daprClient.TrySaveStateAsync<string>(_stateStore, key, updatedValue, wrongEtag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token); });
     }
 
     [Fact]
