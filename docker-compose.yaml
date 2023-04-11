@@ -16,8 +16,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "3500:3500"
     networks:
       - pluggable-dapr
     volumes:
@@ -42,7 +40,10 @@ services:
         - shared-volume:/tmp/dapr-components-sockets
     depends_on:
       - pluggableapp
-    network_mode: "service:pluggableapp"
+    ports:
+      - "3500:3500"
+    networks:
+      - pluggable-dapr
 volumes:
   shared-volume:
   db:

@@ -83,41 +83,31 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
     {
         _logger.LogInformation($"{nameof(GetAsync)}");
 
-        string value = "";
-        string etag = "";
-
         (var dbfactory, var conn) = await _stateStoreInitHelper.GetDbFactory(_logger);
         using (conn)
         {
-            bool notFound = false;
-
             try 
             {
-                (value, etag) = await dbfactory(request.Metadata).GetAsync(request.Key);              
-                if (value == null)
-                    notFound = true;
+                var (value, etag) = await dbfactory(request.Metadata).GetAsync(request.Key);              
+                if (value != null)
+                    return new StateStoreGetResponse
+                    {
+                        Data = System.Text.Encoding.UTF8.GetBytes(value),
+                        ETag = etag
+                    };  
             } 
-            catch(PostgresException ex) when (ex.TableDoesNotExist())
-            {
-                notFound = true;
-            }
             catch(StateStoreInitHelperException ex) when (ex.Message.StartsWith("Missing Tenant Id"))
             {
                 await ThrowGrpcException(ex.Message);
             }
-
-            if (notFound)
+            catch(PostgresException ex) when (ex.TableDoesNotExist())
             {
-                _logger.LogDebug($"{nameof(GetAsync)} - State not found with key : [{request.Key}]");
-                return new StateStoreGetResponse();
-            } 
-        }
+                _logger.LogError(ex, "Table does not exist");
+            }
 
-        return new StateStoreGetResponse
-        {
-            Data = System.Text.Encoding.UTF8.GetBytes(value),
-            ETag = etag
-        };  
+            _logger.LogDebug($"{nameof(GetAsync)} - State not found with key : [{request.Key}]");
+            return new StateStoreGetResponse();            
+        }
     }
 
     public async Task<string[]> GetFeaturesAsync(CancellationToken cancellationToken = default)
@@ -153,10 +143,6 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
             NpgsqlTransaction tran = null;
             try
             {
-                // TODO : Need to implement 'something' here with regards to 'isBinary',
-                // but I do not know what this is trying to achieve. See existing pgSQL built-in component 
-                // https://github.com/dapr/components-contrib/blob/d3662118105a1d8926f0d7b598c8b19cd9dc1ccf/state/postgresql/postgresdbaccess.go#L135
-                
                 tran = await conn.BeginTransactionAsync();
                 var value = System.Text.Encoding.UTF8.GetString(request.Value.Span);
                 await dbfactory(request.Metadata).UpsertAsync(request.Key, value, request.ETag ?? String.Empty, tran);   
@@ -198,9 +184,8 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
                             // TODO : Need to implement 'something' here with regards to 'isBinary',
                             // but I do not know what this is trying to achieve. See existing pgSQL built-in component 
                             // https://github.com/dapr/components-contrib/blob/d3662118105a1d8926f0d7b598c8b19cd9dc1ccf/state/postgresql/postgresdbaccess.go#L135
-                            var body = x.Value.ToArray();
-                            var payload = System.Text.Encoding.UTF8.GetString(body);
-                            await db.UpsertAsync(x.Key, payload, x.ETag ?? String.Empty, tran); 
+                            var value = System.Text.Encoding.UTF8.GetString(x.Value.Span);
+                            await db.UpsertAsync(x.Key, value, x.ETag ?? String.Empty, tran); 
                         }
                     );
                 }

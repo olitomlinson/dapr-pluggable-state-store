@@ -110,7 +110,7 @@ namespace Helpers
                 @$"CREATE TABLE IF NOT EXISTS {SchemaAndTable} 
                 ( 
                     key text NOT NULL PRIMARY KEY COLLATE pg_catalog.""default"" 
-                    ,value text
+                    ,value jsonb NOT NULL
                     ,insertdate TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
                     ,updatedate TIMESTAMP WITH TIME ZONE NULL
                 ) 
@@ -162,6 +162,7 @@ namespace Helpers
                     value = reader.GetString(1);
                     etag = reader.GetString(2);
                     _logger.LogDebug($"{nameof(GetAsync)} - Result - key: {reader.GetString(0)}, value: {value}, etag : {etag}");
+
                     return new Tuple<string,string>(value, etag);
                 }
             }
@@ -199,7 +200,7 @@ namespace Helpers
         public async Task InsertOrUpdateAsync(string key, string value, string etag, NpgsqlTransaction transaction = null)
         {
             int rowsAffected = 0;  
-            var correlationId = Guid.NewGuid().ToString("N").Substring(23);   
+            var correlationId = Guid.NewGuid().ToString("N").Substring(23);
 
             if (String.IsNullOrEmpty(etag))
             {
@@ -259,7 +260,7 @@ namespace Helpers
                 await using (var cmd = new NpgsqlCommand(query, _connection, transaction))
                 {
                     cmd.Parameters.AddWithValue("1", NpgsqlTypes.NpgsqlDbType.Text, key);
-                    cmd.Parameters.AddWithValue("2", NpgsqlTypes.NpgsqlDbType.Jsonb, value);
+                    cmd.Parameters.AddWithValue("2", NpgsqlTypes.NpgsqlDbType.Jsonb, strValue);
                     cmd.Parameters.AddWithValue("3", NpgsqlTypes.NpgsqlDbType.Xid, etagi);
 
                     rowsAffected = await cmd.ExecuteNonQueryAsync();
