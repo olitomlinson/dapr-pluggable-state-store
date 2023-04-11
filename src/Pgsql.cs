@@ -260,7 +260,7 @@ namespace Helpers
                 await using (var cmd = new NpgsqlCommand(query, _connection, transaction))
                 {
                     cmd.Parameters.AddWithValue("1", NpgsqlTypes.NpgsqlDbType.Text, key);
-                    cmd.Parameters.AddWithValue("2", NpgsqlTypes.NpgsqlDbType.Jsonb, strValue);
+                    cmd.Parameters.AddWithValue("2", NpgsqlTypes.NpgsqlDbType.Jsonb, value);
                     cmd.Parameters.AddWithValue("3", NpgsqlTypes.NpgsqlDbType.Xid, etagi);
 
                     rowsAffected = await cmd.ExecuteNonQueryAsync();
