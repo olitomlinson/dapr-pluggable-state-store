@@ -1,0 +1,13 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pluggable-postgres-schema
+spec:
+  type: state.postgresql-tenant
+  version: v1
+  metadata:
+  - name: connectionString
+    #value: "host=my-release-postgresql.default.svc.cluster.local;port=5432;username=postgres;password=wO2VGDsMKR;database=postgres"
+    value: "host=db;port=5432;username=postgres;password=wO2VGDsMKR;database=postgres"
+  - name: tenant
+    value: schema

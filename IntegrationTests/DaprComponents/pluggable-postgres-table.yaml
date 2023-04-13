@@ -1,0 +1,12 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pluggable-postgres-table
+spec:
+  type: state.postgresql-tenant
+  version: v1
+  metadata:
+  - name: connectionString
+    value: "host=db;port=5432;username=postgres;password=postgres;database=postgres"
+  - name: tenant
+    value: table

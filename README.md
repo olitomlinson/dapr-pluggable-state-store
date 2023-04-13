@@ -49,7 +49,7 @@ Create a new `component.yaml` for the pluggable component and place it the defau
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
-  name: pluggable-postgres
+  name: pluggable-postgres-schema
 spec:
   type: state.postgresql-tenant
   version: v1
@@ -66,7 +66,7 @@ Run the dapr process :
 
 Persist a value against a key :
 
-`POST http://localhost:3500/v1.0/state/pluggable-postgres`
+`POST http://localhost:3500/v1.0/state/pluggable-postgres-schema`
 
 ```json
 [
@@ -106,13 +106,13 @@ This will create
 - Docker network
 - Volume for sharing the unix domain socket
 
-Ensure the correct connection string is uncommended in `/DaprComponents/pluggablePostgres.yaml`. Look for the string starting with `host=db` and uncomment this, comment  any other connection strings!
+Ensure the correct connection string is uncommended in `/DaprComponents/pluggable-postgres-table.yaml`. Look for the string starting with `host=db` and uncomment this, comment  any other connection strings!
 
 `docker compose build`
 
 `docker compose up`
 
-Perform State Management queries against the pluggable State Store, hosted at `http://localhost:3500/v1.0/state/pluggable-postgres`
+Perform State Management queries against the pluggable State Store, hosted at `http://localhost:3500/v1.0/state/pluggable-postgres-table`
 
 ---
 
@@ -128,7 +128,7 @@ Install postgres in your k8s cluster :
 - Retain the DNS address thait is provided in the output, it may look something like `my-release-postgresql.default.svc.cluster.local`
 
 
-Edit `/DaprComponents/pluggablePostgres.yaml` - Modify the connection string with the above DNS address and password.
+Edit `/DaprComponents/pluggable-postgre-table.yaml` - Modify the connection string with the above DNS address and password.
 
 It may look something like this ; 
 

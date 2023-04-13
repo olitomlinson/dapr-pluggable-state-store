@@ -23,10 +23,12 @@ namespace DaprComponents.Services;
 
 public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPluggableComponentLiveness, ITransactionalStateStore
 {
+    private readonly string _instanceId;
     private readonly ILogger<StateStoreService> _logger;
     private StateStoreInitHelper _stateStoreInitHelper;
-    public StateStoreService(ILogger<StateStoreService> logger, StateStoreInitHelper stateStoreInitHelper)
+    public StateStoreService(string instanceId, ILogger<StateStoreService> logger, StateStoreInitHelper stateStoreInitHelper)
     {
+        _instanceId = instanceId;
         _logger = logger;
         _stateStoreInitHelper = stateStoreInitHelper;
     }
@@ -112,10 +114,12 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
 
     public async Task<string[]> GetFeaturesAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation($"{nameof(GetFeaturesAsync)}");
-
-        string[] response = { "ETAG", "TRANSACTIONAL" };
-        return response;
+        using (_logger.BeginNamedScope("GetFeatures", ( "DaprInstanceId", _instanceId)))
+        {
+            string[] features = { "ETAG", "TRANSACTIONAL" };
+            _logger.LogInformation($"Registering State Store Features : {string.Join(",", features)}");
+            return features;
+        }
     }
 
     public async Task InitAsync(MetadataRequest request, CancellationToken cancellationToken = default)
@@ -198,5 +202,15 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
                 throw;
             } 
         }
+    }
+}
+
+public static class LoggerExtensions
+{
+    public static IDisposable BeginNamedScope(this ILogger logger, string name, params ValueTuple<string, object>[] properties)
+    {
+        var dictionary = properties.ToDictionary(p => p.Item1, p => p.Item2);
+        dictionary[name + ".Scope"] = Guid.NewGuid();
+        return logger.BeginScope(dictionary);
     }
 }
