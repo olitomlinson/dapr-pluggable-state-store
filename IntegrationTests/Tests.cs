@@ -82,8 +82,6 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
             () => Assert.Equal(seedValue.TestInt, get.TestInt),
             () => Assert.Equal(seedValue.TestStr, get.TestStr)
         );
-
-        Assert.True(true);
     }
 
     [Theory]
@@ -116,8 +114,6 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
             () => Assert.Equal(updatedValue.TestStr, secondGet.TestStr),
             () => Assert.Equal(updatedValue.TestInt, secondGet.TestInt)
         );
-
-        Assert.True(true);
     }
 
     [Theory]

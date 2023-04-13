@@ -99,11 +99,6 @@ public sealed class PluggableContainer : IAsyncLifetime
         await _network.DeleteAsync().ConfigureAwait(false);
         await _socketVolume.DeleteAsync().ConfigureAwait(false);
     }
-
-    public async Task<ExecResult> GetStateViaSQL(string key, string tenantId){
-        return await ((PostgreSqlContainer)_postgresContainer).ExecScriptAsync($"SELECT value FROM \"public\".\"{tenantId}-state\" WHERE key = '{_dapr_app_id}'");
-    }
-
     public DaprClient GetDaprClient(){
         return _daprClient;
     }
