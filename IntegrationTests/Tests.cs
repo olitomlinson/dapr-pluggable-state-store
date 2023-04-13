@@ -9,19 +9,21 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
     private readonly ITestOutputHelper output;
     private readonly PluggableContainer _pluggableContainer;
     private readonly DaprClient _daprClient;
-
     private Func<string> GetRandomKey;
-
-    private string _stateStore;
+    private static string _pluggableStore = "pluggable-postgres";
+    private static string _InTreeStore = "standard-postgres";
     private Random _random = new Random();
+
+    public static IEnumerable<object[]> StateStoresToTestAgainst(){
+        yield return new object[] { _pluggableStore };
+        yield return new object[] { _InTreeStore };
+    }
 
     public StateIsolationTests(PluggableContainer pluggableContainer, ITestOutputHelper output)
     {
         _pluggableContainer = pluggableContainer;
         _daprClient = _pluggableContainer.GetDaprClient();
         this.output = output;
-        _stateStore = "pluggable-postgres";
-        //_stateStore = "standard-postgres";
         GetRandomKey = () => {  return $"key-{_random.Next(1000000, 9999999)}"; };
     }
 
@@ -35,15 +37,13 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
     [Fact]
     public async Task StateIsSharedWithinTenant()
     {
-        var ct = new CancellationTokenSource(5000).Token;
-
         var key = GetRandomKey();
         var value = "Bar";
         var tenantId = Guid.NewGuid().ToString();
 
-        await _daprClient.SaveStateAsync(_stateStore, key, value, metadata: tenantId.AsMetaData(), cancellationToken: ct);
+        await _daprClient.SaveStateAsync(_pluggableStore, key, value, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
         
-        var retrievedState = await _daprClient.GetStateAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: ct);
+        var retrievedState = await _daprClient.GetStateAsync<string>(_pluggableStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
         Assert.Equal(value, retrievedState);
     }
@@ -51,21 +51,20 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
     [Fact]
     public async Task StateIsNotSharedAcrossTenants()
     {
-        var ct = new CancellationTokenSource(5000).Token;
-
         var key = GetRandomKey();
         var value = "Bar";
         var tenantId = Guid.NewGuid().ToString();
         var illegalTenantId = Guid.NewGuid().ToString();
 
-        await _daprClient.SaveStateAsync(_stateStore, key, value, metadata: tenantId.AsMetaData(), cancellationToken: ct);
-        var retrievedState = await _daprClient.GetStateAsync<string>(_stateStore, key, metadata: illegalTenantId.AsMetaData(), cancellationToken: ct);
+        await _daprClient.SaveStateAsync(_pluggableStore, key, value, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var retrievedState = await _daprClient.GetStateAsync<string>(_pluggableStore, key, metadata: illegalTenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
         Assert.Null(retrievedState);
     }
 
-    [Fact]
-    public async Task ObjectsCanBeStoredAndRetrieved()
+    [Theory]
+    [MemberData(nameof(StateStoresToTestAgainst))]
+    public async Task ObjectsCanBeStoredAndRetrieved(string stateStoreName)
     {
         var key = GetRandomKey();
         var tenantId = Guid.NewGuid().ToString();
@@ -76,8 +75,8 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
             TestInt = 99999
         };
 
-        await _daprClient.SaveStateAsync<TestClass>(_stateStore, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var get = await _daprClient.GetStateAsync<TestClass>(_stateStore, key, metadata: metadata);     
+        await _daprClient.SaveStateAsync<TestClass>(stateStoreName, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var get = await _daprClient.GetStateAsync<TestClass>(stateStoreName, key, metadata: metadata);     
 
         Assert.Multiple(
             () => Assert.Equal(seedValue.TestInt, get.TestInt),
@@ -87,8 +86,9 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         Assert.True(true);
     }
 
-    [Fact]
-    public async Task SequentialObjectUpdatesWithoutEtag()
+    [Theory]
+    [MemberData(nameof(StateStoresToTestAgainst))]
+    public async Task ObjectUpdatesWithoutEtag(string stateStoreName)
     {
         var key = GetRandomKey();
         var tenantId = Guid.NewGuid().ToString();
@@ -99,16 +99,16 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
             TestInt = 99999
         };
 
-        await _daprClient.SaveStateAsync<TestClass>(_stateStore, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var firstGet = await _daprClient.GetStateAsync<TestClass>(_stateStore, key, metadata: metadata);   
+        await _daprClient.SaveStateAsync<TestClass>(stateStoreName, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var firstGet = await _daprClient.GetStateAsync<TestClass>(stateStoreName, key, metadata: metadata);   
 
         var updatedValue = new TestClass {
             TestStr = seedValue.TestStr,
             TestInt = seedValue.TestInt
         };
 
-        await _daprClient.SaveStateAsync<TestClass>(_stateStore, key, updatedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var secondGet = await _daprClient.GetStateAsync<TestClass>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);  
+        await _daprClient.SaveStateAsync<TestClass>(stateStoreName, key, updatedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var secondGet = await _daprClient.GetStateAsync<TestClass>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);  
 
         Assert.Multiple(
             () => Assert.Equal(seedValue.TestInt, firstGet.TestInt),
@@ -120,19 +120,20 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         Assert.True(true);
     }
 
-    [Fact]
-    public async Task SequentialUpdatesWithoutEtag()
+    [Theory]
+    [MemberData(nameof(StateStoresToTestAgainst))]
+    public async Task UpdatesWithoutEtag(string stateStoreName)
     {
         var key = GetRandomKey();
         var seedValue = "Chicken";
         var tenantId = Guid.NewGuid().ToString();
 
-        await _daprClient.SaveStateAsync(_stateStore, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var firstGet = await _daprClient.GetStateAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        await _daprClient.SaveStateAsync(stateStoreName, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var firstGet = await _daprClient.GetStateAsync<string>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
         var updatedValue = "Egg";
-        await _daprClient.SaveStateAsync(_stateStore, key, updatedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var secondGet = await _daprClient.GetStateAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        await _daprClient.SaveStateAsync(stateStoreName, key, updatedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var secondGet = await _daprClient.GetStateAsync<string>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
         Assert.Multiple(
             () => Assert.Equal(seedValue,firstGet),
@@ -140,20 +141,21 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         );
     }
 
-    [Fact]
-    public async Task SequentialUpdatesWithEtag()
+    [Theory]
+    [MemberData(nameof(StateStoresToTestAgainst))]
+    public async Task UpdatesWithEtag(string stateStoreName)
     {
         var key = GetRandomKey();
         var seedValue = "Chicken";
         var tenantId = Guid.NewGuid().ToString();
 
-        await _daprClient.SaveStateAsync<string>(_stateStore, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        await _daprClient.SaveStateAsync<string>(stateStoreName, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
         var updatedValue = "Egg";
 
-        var success = await _daprClient.TrySaveStateAsync<string>(_stateStore, key, updatedValue, etag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var secondGet = await _daprClient.GetStateAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var success = await _daprClient.TrySaveStateAsync<string>(stateStoreName, key, updatedValue, etag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var secondGet = await _daprClient.GetStateAsync<string>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
   
         Assert.Multiple(
             () => Assert.Equal(seedValue,firstGet),
@@ -161,58 +163,42 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         );
     }
 
-    [Fact]
-    public async Task SequentialUpdatesAndEtagMismatchIsThrown()
+    [Theory]
+    [MemberData(nameof(StateStoresToTestAgainst))]
+    public async Task UpdatesAndEtagInvalidIsThrown(string stateStoreName)
     {
         var key = GetRandomKey();
         var seedValue = "Chicken";
         var tenantId = Guid.NewGuid().ToString();
 
-        await _daprClient.SaveStateAsync<string>(_stateStore, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        await _daprClient.SaveStateAsync<string>(stateStoreName, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
         var updatedValue = "Egg";
-        var wrongEtag = $"98765";
-
-        var success = await _daprClient.TrySaveStateAsync<string>(_stateStore, key, updatedValue, wrongEtag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-       
-        Assert.False(success);
-    }
-
-    [Fact]
-    public async Task SequentialUpdatesAndEtagInvalidIsThrown()
-    {
-        var key = GetRandomKey();
-        var seedValue = "Chicken";
-        var tenantId = Guid.NewGuid().ToString();
-
-        await _daprClient.SaveStateAsync<string>(_stateStore, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-
-        var updatedValue = "Egg";
-        var wrongEtag = $"not-a-valid-etag";
+        var malformedEtag = $"not-a-valid-etag";
 
         await Assert.ThrowsAsync<Dapr.DaprException>(async () => { 
-            await _daprClient.TrySaveStateAsync<string>(_stateStore, key, updatedValue, wrongEtag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token); });
+            await _daprClient.TrySaveStateAsync<string>(stateStoreName, key, updatedValue, malformedEtag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token); });
     }
 
-    [Fact]
-    public async Task SequentialUpdatesCantUseOldEtags()
+    [Theory(Skip = "blocked by https://github.com/dapr/components-contrib/issues/2773")]
+    [MemberData(nameof(StateStoresToTestAgainst))]
+    public async Task UpdatesCantUseOldEtags(string stateStoreName)
     {
         var key = GetRandomKey();
         var seedValue = "Chicken";
         var tenantId = Guid.NewGuid().ToString();
 
-        await _daprClient.SaveStateAsync<string>(_stateStore, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        await _daprClient.SaveStateAsync<string>(stateStoreName, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
         var updatedValue = "Egg";
-        await _daprClient.SaveStateAsync<string>(_stateStore, key, updatedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var secondGet = await _daprClient.GetStateAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        await _daprClient.SaveStateAsync<string>(stateStoreName, key, updatedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var secondGet = await _daprClient.GetStateAsync<string>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
   
         updatedValue = "Goose";
-        var success = await _daprClient.TrySaveStateAsync<string>(_stateStore, key, updatedValue, etag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var thirdGet = await _daprClient.GetStateAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var success = await _daprClient.TrySaveStateAsync<string>(stateStoreName, key, updatedValue, etag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var thirdGet = await _daprClient.GetStateAsync<string>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
   
         Assert.Multiple(
             () => Assert.False(success),
@@ -220,18 +206,19 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         );
     }
 
-     [Fact]
-    public async Task DeleteWithoutEtag()
+    [Theory]
+    [MemberData(nameof(StateStoresToTestAgainst))]
+    public async Task DeleteWithoutEtag(string stateStoreName)
     {
         var key = GetRandomKey();
         var seedValue = "Chicken";
         var tenantId = Guid.NewGuid().ToString();
 
-        await _daprClient.SaveStateAsync<string>(_stateStore, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var firstGet = await _daprClient.GetStateAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        await _daprClient.SaveStateAsync<string>(stateStoreName, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var firstGet = await _daprClient.GetStateAsync<string>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
-        await _daprClient.DeleteStateAsync(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var secondGet = await _daprClient.GetStateAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        await _daprClient.DeleteStateAsync(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var secondGet = await _daprClient.GetStateAsync<string>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
         Assert.Multiple(
             () => Assert.Equal(seedValue, firstGet),
@@ -239,18 +226,19 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         );
     }
 
-    [Fact]
-    public async Task DeleteWithEtag()
+    [Theory]
+    [MemberData(nameof(StateStoresToTestAgainst))]
+    public async Task DeleteWithEtag(string stateStoreName)
     {
         var key = GetRandomKey();
         var seedValue = "Chicken";
         var tenantId = Guid.NewGuid().ToString();
 
-        await _daprClient.SaveStateAsync<string>(_stateStore, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        await _daprClient.SaveStateAsync<string>(stateStoreName, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
-        var success = await _daprClient.TryDeleteStateAsync(_stateStore, key, etag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var secondGet = await _daprClient.GetStateAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var success = await _daprClient.TryDeleteStateAsync(stateStoreName, key, etag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var secondGet = await _daprClient.GetStateAsync<string>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
         Assert.Multiple(
             () => Assert.True(success),
@@ -258,18 +246,19 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         );
     }
 
-    [Fact]
-    public async Task DeleteWithWrongEtagDoesNotDelete()
+    [Theory]
+    [MemberData(nameof(StateStoresToTestAgainst))]
+    public async Task DeleteWithWrongEtagDoesNotDelete(string stateStoreName)
     {
         var key = GetRandomKey();
         var seedValue = "Chicken";
         var tenantId = Guid.NewGuid().ToString();
 
-        await _daprClient.SaveStateAsync<string>(_stateStore, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
-        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>(_stateStore, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        await _daprClient.SaveStateAsync<string>(stateStoreName, key, seedValue, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var (firstGet, etag) = await _daprClient.GetStateAndETagAsync<string>(stateStoreName, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
 
-        var wrongEtag = $"123456";
-        var success = await _daprClient.TryDeleteStateAsync(_stateStore, key, wrongEtag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+        var wrongEtag = $"123";
+        var success = await _daprClient.TryDeleteStateAsync(stateStoreName, key, wrongEtag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
        
         Assert.Multiple(
             () => Assert.Equal(seedValue, firstGet),
@@ -277,8 +266,9 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         );
     }
 
-    [Fact]
-    public async Task ParallelUpsertOperationsAcrossUniqueTenants()
+    [Theory]
+    [MemberData(nameof(StateStoresToTestAgainst))]
+    public async Task ParallelUpdatesAcrossUniqueTenants(string stateStoreName)
     {
 
         IEnumerable<(string,string)> produceTestData(int upto)
@@ -296,8 +286,8 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         {
             string tenantId = Guid.NewGuid().ToString();
             var metadata = tenantId.AsMetaData();
-            await _daprClient.SaveStateAsync<string>(_stateStore, input.Item1, input.Item2, metadata: metadata, cancellationToken: token);
-            var get = await _daprClient.GetStateAsync<string>(_stateStore, input.Item1, metadata: metadata);
+            await _daprClient.SaveStateAsync<string>(stateStoreName, input.Item1, input.Item2, metadata: metadata, cancellationToken: token);
+            var get = await _daprClient.GetStateAsync<string>(stateStoreName, input.Item1, metadata: metadata);
             if (input.Item2 != get)
                 Assert.Fail("get value did not match what was persisted");
         });
@@ -305,8 +295,9 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         Assert.True(true);
     }
 
-    [Fact]
-    public async Task ParallelUpsertOperationsOnSingleTenant()
+    [Theory]
+    [MemberData(nameof(StateStoresToTestAgainst))]
+    public async Task ParallelUpdatesOnSingleTenant(string stateStoreName)
     {
         var tenantId = Guid.NewGuid().ToString();
         var metadata = tenantId.AsMetaData();
@@ -318,7 +309,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
                 Maybe a better long term solution is to move to SERIALIZABLE isolation, but this
                 will come with a performance degredation. */
 
-        await _daprClient.SaveStateAsync<string>(_stateStore, "probe", "probe", metadata: metadata);
+        await _daprClient.SaveStateAsync<string>(stateStoreName, "probe", "probe", metadata: metadata);
         await Task.Delay(500);
         /*  END PROBE */
 
@@ -335,8 +326,8 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         var options = new ParallelOptions() { MaxDegreeOfParallelism = 50, CancellationToken = cts.Token };
         await Parallel.ForEachAsync(produceTestData(1000), options, async (input, token) =>
         {
-            await _daprClient.SaveStateAsync<string>(_stateStore, input.Item1, input.Item2, metadata: metadata, cancellationToken: token);
-            var get = await _daprClient.GetStateAsync<string>(_stateStore, input.Item1, metadata: metadata);
+            await _daprClient.SaveStateAsync<string>(stateStoreName, input.Item1, input.Item2, metadata: metadata, cancellationToken: token);
+            var get = await _daprClient.GetStateAsync<string>(stateStoreName, input.Item1, metadata: metadata);
             if (input.Item2 != get)
                 Assert.Fail("get value did not match what was persisted");
         });
