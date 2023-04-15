@@ -1,6 +1,6 @@
 ### Status
 
-This probject is currently a Work in Progress
+This project is currently a Work in Progress. It is 99% functional, but requires some tidying up & security hardening.
 
 ### Purpose
 
@@ -23,7 +23,7 @@ Tenant-aware state operations requires a client to specify a `tenantId` as part 
 ### To do
 
 - Implement a native `BulkGet` and `BulkSet`
-- Support `IsBinary` (Properly utilise JSONP in `value` col)
+- Support `IsBinary` - Blocked by https://github.com/dapr/components-contrib/issues/2773"
 - ~~Look again at `XMIN` for Etag~~
 - Review Indexes (particulary around `key` and `etag`)
 
@@ -128,7 +128,7 @@ Install postgres in your k8s cluster :
 - Retain the DNS address thait is provided in the output, it may look something like `my-release-postgresql.default.svc.cluster.local`
 
 
-Edit `/DaprComponents/pluggable-postgre-table.yaml` - Modify the connection string with the above DNS address and password.
+Edit `/DaprComponents/pluggable-postgres-table.yaml` - Modify the connection string with the above DNS address and password.
 
 It may look something like this ; 
 
@@ -142,7 +142,7 @@ Build the pluggable component :
 
 Deploy the pluggable component yaml : 
 
-` kubectl apply -f ./DaprComponents/pluggablePostgres.yaml`
+` kubectl apply -f ./DaprComponents/pluggable-postgres-table.yaml`
 
 Deploy the app : 
 
@@ -150,7 +150,7 @@ Deploy the app :
 
 Once the deployment is complete, port forward onto the dapr sidecars Dapr HTTP port (`dapr-http-port`) so you can access this from your host machine.
 
-Perform State Management queries against the pluggable State Store, hosted at `http://localhost:3500/v1.0/state/pluggable-postgres`
+Perform State Management queries against the pluggable State Store, hosted at `http://localhost:3500/v1.0/state/pluggable-postgres-table`
 
 ---
 
