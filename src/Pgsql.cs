@@ -22,8 +22,8 @@ namespace Helpers
                 To mitigate this, the dictionarys could potentially be replaced with MemoryCache
                 objects. (Assuming modern MemoryCache in .NET 6 is good to go)
         */
-        static ConcurrentDictionary<string, object> _locks = new ConcurrentDictionary<string, object>();
-        static ConcurrentDictionary<string, string> _resources = new ConcurrentDictionary<string, string>();
+        static private ConcurrentDictionary<string, object> _locks = new ConcurrentDictionary<string, object>();
+        static private ConcurrentDictionary<string, string> _resources = new ConcurrentDictionary<string, string>();
 
         public Pgsql(string schema, string table, NpgsqlConnection connection, ILogger logger)
         {
@@ -178,7 +178,7 @@ namespace Helpers
         private void EnsureDatabaseResourcesExist(NpgsqlTransaction transaction = null)
         {
             GateAccessToResourceCreation($"S:{_schema}", () => CreateSchemaIfNotExistsAsync(transaction).Wait());
-            GateAccessToResourceCreation($"T:{_table}", () => CreateTableIfNotExistsAsync(transaction).Wait());
+            GateAccessToResourceCreation($"T:{_schema}-{_table}", () => CreateTableIfNotExistsAsync(transaction).Wait());
         }
 
         private void GateAccessToResourceCreation(string resourceName, Action resourceFactory)
@@ -279,9 +279,9 @@ namespace Helpers
         {      
             var sql = "";
             if (string.IsNullOrEmpty(etag))
-                sql = $"SELECT * FROM {_schema}.delete_key_v1(tbl := '{_table}', keyvalue := '{key}')";
+                sql = $"SELECT * FROM {_SafeSchema}.delete_key_v1(tbl := '{_schema}.{_table}', keyvalue := '{key}')";
             else
-                sql = $"SELECT * FROM {_schema}.delete_key_with_etag_v1(tbl := '{_table}', keyvalue := '{key}', etagvalue := '{etag}')";
+                sql = $"SELECT * FROM {_SafeSchema}.delete_key_with_etag_v1(tbl := '{_schema}.{_table}', keyvalue := '{key}', etagvalue := '{etag}')";
             _logger.LogDebug($"{nameof(DeleteAsync)} - Sql : [{sql}]");
 
             using (var cmd = new NpgsqlCommand(sql, _connection, transaction))

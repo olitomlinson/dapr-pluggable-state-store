@@ -271,7 +271,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         );
     }
 
-    [Theory(Skip = "test")]
+    [Theory]
     [MemberData(nameof(AllStores))]
     public async Task ParallelUpdatesAcrossUniqueTenants(string store)
     {
@@ -300,7 +300,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         Assert.True(true);
     }
 
-    [Theory(Skip = "test")]
+    [Theory]
     [MemberData(nameof(AllStores))]
     public async Task ParallelUpdatesOnSingleTenant(string store)
     {
