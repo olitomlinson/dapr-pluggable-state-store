@@ -35,6 +35,7 @@ public sealed class PluggableContainer : IAsyncLifetime
             .Build();
 
         _postgresContainer = new PostgreSqlBuilder()
+            .WithImage("postgres:15.2-alpine")
             .WithNetwork(_network)
             .WithName($"postgres-{containerSuffix}")
             .WithCommand("-c", "log_statement=all")
