@@ -186,7 +186,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
             await _daprClient.TrySaveStateAsync<string>(store, key, updatedValue, malformedEtag, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token); });
     }
 
-    [Theory(Skip = "blocked by https://github.com/dapr/components-contrib/issues/2773")]
+    [Theory]
     [MemberData(nameof(AllStores))]
     public async Task UpdatesCantUseOldEtags(string store)
     {
