@@ -124,17 +124,21 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
 
     public async Task InitAsync(MetadataRequest request, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation($"{nameof(InitAsync)}");
-
-        await _stateStoreInitHelper.InitAsync(request.Properties);
-
-        return;
+        using (_logger.BeginNamedScope("Init", ( "DaprInstanceId", _instanceId)))
+        {
+            _logger.LogInformation("Initialising state store component");
+            await _stateStoreInitHelper.InitAsync(request.Properties);
+            return;
+        }
     }
 
     public async Task PingAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation($"{nameof(PingAsync)}");
-        return;
+        using (_logger.BeginNamedScope("Ping", ( "DaprInstanceId", _instanceId)))
+        {
+            _logger.LogInformation("Pinging postgres...");
+            await _stateStoreInitHelper.PerformDatabaseProbeAsync();
+        }
     }
 
     public async Task SetAsync(StateStoreSetRequest request, CancellationToken cancellationToken = default)

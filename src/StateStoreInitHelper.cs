@@ -21,6 +21,18 @@ namespace Helpers
             TenantAwareDatabaseFactory = (_,_,_) => { throw new InvalidOperationException("Call 'InitAsync' first"); };
         }
 
+        public async Task PerformDatabaseProbeAsync()
+        {
+            var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync();   
+            await using (var cmd = new NpgsqlCommand("SELECT 1", connection))
+            {
+                await using (var reader = await cmd.ExecuteReaderAsync())
+                { }
+            }
+            await connection.CloseAsync();
+        }
+
         public async Task<(Func<IReadOnlyDictionary<string,string>, Pgsql>, NpgsqlConnection)> GetDbFactory(ILogger logger)
         {
             var connection = new NpgsqlConnection(_connectionString);

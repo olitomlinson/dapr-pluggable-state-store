@@ -1,4 +1,4 @@
-version: '3.4'
+version: '3.8'
 services:
   db:
     image: postgres:15.2-alpine
@@ -33,7 +33,7 @@ services:
     command: ["./daprd",
      "-app-id", "pluggableapp",
      "-dapr-http-port", "3500",
-     "-components-path", "/DaprComponents",
+     "-resources-path", "/DaprComponents",
      "-log-level","debug"]
     volumes:
         - "./DaprComponents/:/DaprComponents"

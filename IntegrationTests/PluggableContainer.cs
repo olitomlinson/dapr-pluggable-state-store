@@ -59,7 +59,7 @@ public sealed class PluggableContainer : IAsyncLifetime
             .WithCommand("-app-id", _dapr_app_id)
             .WithCommand("-dapr-http-port", _dapr_http_port.ToString())
             .WithCommand("-dapr-grpc-port", _dapr_grpc_port.ToString())
-            .WithCommand("-components-path", "/DaprComponents")
+            .WithCommand("-resources-path", "/DaprComponents")
             .WithCommand("-log-level", "debug")
             .WithWaitStrategy(
                 Wait.ForUnixContainer()
