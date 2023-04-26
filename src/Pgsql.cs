@@ -23,7 +23,7 @@ namespace Helpers
                 objects. (Assuming modern MemoryCache in .NET 6 is good to go)
         */
         static private ConcurrentDictionary<string, object> _locks = new ConcurrentDictionary<string, object>();
-        static private ConcurrentDictionary<string, string> _resources = new ConcurrentDictionary<string, string>();
+        static private ConcurrentDictionary<string, string> _resourcesLedger = new ConcurrentDictionary<string, string>();
 
         public Pgsql(string schema, string table, NpgsqlConnection connection, ILogger logger)
         {
@@ -171,30 +171,40 @@ namespace Helpers
 
         public async Task UpsertAsync(string key, string value, string etag, NpgsqlTransaction transaction = null)
         {
-            EnsureDatabaseResourcesExist(transaction);
+            await EnsureDatabaseResourcesExistAsync(transaction);
             await InsertOrUpdateAsync(key, value, etag, transaction);
         }
 
-        private void EnsureDatabaseResourcesExist(NpgsqlTransaction transaction = null)
+        private async Task EnsureDatabaseResourcesExistAsync(NpgsqlTransaction transaction = null)
         {
-            GateAccessToResourceCreation($"S:{_schema}", () => CreateSchemaIfNotExistsAsync(transaction).Wait());
-            GateAccessToResourceCreation($"T:{_schema}-{_table}", () => CreateTableIfNotExistsAsync(transaction).Wait());
+            await GateAccessToResourceCreationAsync($"S:{_schema}", () => CreateSchemaIfNotExistsAsync(transaction));
+            await GateAccessToResourceCreationAsync($"T:{_schema}-{_table}", () => CreateTableIfNotExistsAsync(transaction));
         }
 
-        private void GateAccessToResourceCreation(string resourceName, Action resourceFactory)
+        private async Task GateAccessToResourceCreationAsync(string resourceName, Func<Task> resourceFactory)
         {
-            if (!_resources.TryGetValue(resourceName, out string _))
-            {   
-                var _lock = _locks.GetOrAdd(resourceName, (x) => { return new Object(); });
-                lock (_lock) 
-                {
-                    if (!_resources.TryGetValue(resourceName, out string _))
-                    { 
-                        resourceFactory();
-                        _resources.TryAdd(resourceName, DateTime.UtcNow.ToString());
-                    }
-                }
-            }
+            // check the in-memory ledger to see if the resource has already been created
+            // (remember that this ledger is not global, it's per pluggable component instance (think pod instance)!)
+            if (_resourcesLedger.TryGetValue(resourceName, out string _)) 
+                return; 
+             
+            // get the lock for this particular resource
+            // TODO : Should replace with dapr distributed lock when it GA's)
+            var _lock = _locks.GetOrAdd(resourceName, (x) => { return new Object(); });
+
+            // wait patiently until we have exlusive access of the resource...
+            lock (_lock) 
+            {
+                // check ledger again to make sure the resource hasn't been created by some other racing thread...
+                if (_resourcesLedger.TryGetValue(resourceName, out string _)) 
+                    return;
+                
+                // resource doesn't exist, no other thread has exlusive access, so create it now...
+                resourceFactory().Wait();
+
+                // while we have exlusive write-access, update the ledger to show it has been created
+                _resourcesLedger.TryAdd(resourceName, DateTime.UtcNow.ToString());
+            } 
         }
 
         public async Task InsertOrUpdateAsync(string key, string value, string etag, NpgsqlTransaction transaction = null)
