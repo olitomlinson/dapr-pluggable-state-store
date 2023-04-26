@@ -8,6 +8,6 @@
   <ItemGroup>
     <PackageReference Include="Dapr.PluggableComponents.AspNetCore" Version="0.1.0" />
     <PackageReference Include="Google.Api.CommonProtos" Version="2.8.0" />
-    <PackageReference Include="Npgsql" Version="7.0.0" />
+    <PackageReference Include="Npgsql" Version="7.0.4" />
   </ItemGroup>
 </Project>
