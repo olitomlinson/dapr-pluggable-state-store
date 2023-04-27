@@ -1,3 +1,5 @@
+[![.NET](https://github.com/olitomlinson/dapr-pluggable-state-store/actions/workflows/dotnet.yml/badge.svg)](https://github.com/olitomlinson/dapr-pluggable-state-store/actions/workflows/dotnet.yml)
+
 ### Status
 
 This project is currently a Work in Progress. It is 99% functional, but requires some tidying up & security hardening.
