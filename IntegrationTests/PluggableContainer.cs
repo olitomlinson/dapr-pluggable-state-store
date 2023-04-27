@@ -45,7 +45,7 @@ public sealed class PluggableContainer : IAsyncLifetime
         _socketVolume = new VolumeBuilder().Build();
 
         _daprContainer = new ContainerBuilder()
-            .WithImage("daprio/daprd:edge-mariner")
+            .WithImage("daprio/daprd:nightly-2023-04-27-mariner")
             .WithName($"dapr-{containerSuffix}")
             .WithNetwork(_network)
             .WithNetworkAliases("dapr")
