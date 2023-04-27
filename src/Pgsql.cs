@@ -189,7 +189,6 @@ namespace Helpers
                 return; 
              
             // get the lock for this particular resource
-            // TODO : Should replace with dapr distributed lock when it GA's)
             var _lock = _locks.GetOrAdd(resourceName, (x) => { return new Object(); });
 
             // wait patiently until we have exlusive access of the resource...
