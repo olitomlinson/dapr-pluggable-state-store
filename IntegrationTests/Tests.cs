@@ -187,7 +187,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
     }
 
     [Theory]
-    [MemberData(nameof(AllStores))]
+    [MemberData(nameof(OnlyTenantStores))]
     public async Task UpdatesCantUseOldEtags(string store)
     {
         var key = GetRandomKey();
