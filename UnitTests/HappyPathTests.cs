@@ -13,7 +13,7 @@ public class HappyPathTests
     public async Task DefaultSchemaAndNameAreAppliedWhenNotUsingTenancy()
     {
         var pgsqlFactory = Substitute.For<IPgsqlFactory>();
-        var h = new StateStoreInitHelper(pgsqlFactory);
+        var h = new StateStoreInitHelper(pgsqlFactory, Substitute.For<ILogger>());
 
         var componentMetadata = new Dictionary<string,string>() {
             { "connectionString", "some-c-string" }};
@@ -29,7 +29,7 @@ public class HappyPathTests
     public async Task TenantIdIsPrefixedToDefaultSchemaName()
     {
         var pgsqlFactory = Substitute.For<IPgsqlFactory>();
-        var h = new StateStoreInitHelper(pgsqlFactory);
+        var h = new StateStoreInitHelper(pgsqlFactory, Substitute.For<ILogger>());
 
         var componentMetadata = new Dictionary<string,string>() {
             { "connectionString",   "some-c-string" },
@@ -49,7 +49,7 @@ public class HappyPathTests
     public async Task TenantIdIsPrefixedToCustomSchemaName()
     {
         var pgsqlFactory = Substitute.For<IPgsqlFactory>();
-        var h = new StateStoreInitHelper(pgsqlFactory);
+        var h = new StateStoreInitHelper(pgsqlFactory, Substitute.For<ILogger>());
 
         var componentMetadata = new Dictionary<string,string>() {
         {"connectionString",    "some-c-string" },
@@ -68,7 +68,7 @@ public class HappyPathTests
     public async Task TenantIdIsPrefixedToDefaultTableName()
     {
         var pgsqlFactory = Substitute.For<IPgsqlFactory>();
-        var h = new StateStoreInitHelper(pgsqlFactory);
+        var h = new StateStoreInitHelper(pgsqlFactory, Substitute.For<ILogger>());
 
         var componentMetadata = new Dictionary<string,string>(){
             { "connectionString", "some-c-string"},
@@ -87,7 +87,7 @@ public class HappyPathTests
     public async Task TenantIdIsPrefixedToCustomTableName()
     {
         var pgsqlFactory = Substitute.For<IPgsqlFactory>();
-        var h = new StateStoreInitHelper(pgsqlFactory);
+        var h = new StateStoreInitHelper(pgsqlFactory, Substitute.For<ILogger>());
 
         var componentMetadata = new Dictionary<string,string>(){
             {"connectionString", "some-c-string"},

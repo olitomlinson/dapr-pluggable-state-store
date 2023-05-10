@@ -38,7 +38,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
     {
          _logger.LogInformation($"{nameof(DeleteAsync)}");
         
-        (var dbfactory, var conn) = await _stateStoreInitHelper.GetDbFactory(_logger);
+        (var dbfactory, var conn) = await _stateStoreInitHelper.GetDbFactory();
         using (conn)
         {
             var tran = await conn.BeginTransactionAsync();
@@ -85,7 +85,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
     {
         _logger.LogInformation($"{nameof(GetAsync)}");
 
-        (var dbfactory, var conn) = await _stateStoreInitHelper.GetDbFactory(_logger);
+        (var dbfactory, var conn) = await _stateStoreInitHelper.GetDbFactory();
         using (conn)
         {
             try 
@@ -145,7 +145,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
     {
         _logger.LogInformation($"{nameof(SetAsync)}");
                 
-        (var dbfactory, var conn) = await _stateStoreInitHelper.GetDbFactory(_logger);
+        (var dbfactory, var conn) = await _stateStoreInitHelper.GetDbFactory();
         using (conn)
         {
             NpgsqlTransaction tran = null;
@@ -153,7 +153,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
             {
                 tran = await conn.BeginTransactionAsync();
                 var value = System.Text.Encoding.UTF8.GetString(request.Value.Span);
-                await dbfactory(request.Metadata).UpsertAsync(request.Key, value, request.ETag ?? String.Empty, tran);   
+                await dbfactory(request.Metadata).UpsertAsync(request.Key, value, request.ETag ?? String.Empty, GetTTLfromOperationMetadata(request.Metadata), tran);   
                 await tran.CommitAsync();
             }
             catch(Exception ex)
@@ -166,6 +166,13 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
         return;
     }
 
+    private int GetTTLfromOperationMetadata(IReadOnlyDictionary<string,string> metadata)
+    {
+        if (metadata.TryGetValue("ttlInSeconds", out string ttl))
+            return Convert.ToInt32(ttl);
+        return 0;
+    }
+
     public async Task TransactAsync(StateStoreTransactRequest request, CancellationToken cancellationToken = default)
     {
 
@@ -174,7 +181,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
         if (!request.Operations.Any())
             return;
 
-        (var dbfactory, var conn) = await _stateStoreInitHelper.GetDbFactory(_logger);
+        (var dbfactory, var conn) = await _stateStoreInitHelper.GetDbFactory();
         using (conn)
         {
             var tran = await conn.BeginTransactionAsync();
@@ -193,7 +200,7 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
                             // but I do not know what this is trying to achieve. See existing pgSQL built-in component 
                             // https://github.com/dapr/components-contrib/blob/d3662118105a1d8926f0d7b598c8b19cd9dc1ccf/state/postgresql/postgresdbaccess.go#L135
                             var value = System.Text.Encoding.UTF8.GetString(x.Value.Span);
-                            await db.UpsertAsync(x.Key, value, x.ETag ?? String.Empty, tran); 
+                            await db.UpsertAsync(x.Key, value, x.ETag ?? String.Empty, GetTTLfromOperationMetadata(request.Metadata), tran); 
                         }
                     );
                 }

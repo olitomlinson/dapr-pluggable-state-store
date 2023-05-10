@@ -42,6 +42,30 @@ namespace Helpers
             _connection = connection;
         }
 
+        public async Task CreateTenantMetadataTableIfNotExistsAsync(NpgsqlTransaction transaction = null){
+            var sql = 
+                @$"CREATE SCHEMA IF NOT EXISTS ""pluggable_metadata"" 
+                AUTHORIZATION postgres;
+                
+                CREATE TABLE IF NOT EXISTS ""pluggable_metadata"".""tenant""
+                ( 
+                    tenant_id text NOT NULL PRIMARY KEY COLLATE pg_catalog.""default"" 
+                    ,insert_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                    ,last_expired_at TIMESTAMP WITH TIME ZONE NULL
+                ) 
+                TABLESPACE pg_default; 
+                ALTER TABLE IF EXISTS ""pluggable_metadata"".""tenant"" OWNER to postgres;
+                ";
+
+            _logger.LogDebug($"{nameof(CreateTenantMetadataTableIfNotExistsAsync)} - {sql}");
+            
+            await using (var cmd = new NpgsqlCommand(sql, _connection, transaction))
+            await cmd.ExecuteNonQueryAsync();
+
+            _logger.LogDebug($"{nameof(CreateTenantMetadataTableIfNotExistsAsync)} - Schema & Table Created : {_SafeSchema}");
+            
+        }
+
         public async Task CreateSchemaIfNotExistsAsync(NpgsqlTransaction transaction = null)
         {
             var sql = 
@@ -113,9 +137,13 @@ namespace Helpers
                     ,value jsonb NOT NULL
                     ,insertdate TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
                     ,updatedate TIMESTAMP WITH TIME ZONE NULL
+                    ,expiredate TIMESTAMP WITH TIME ZONE NULL
                 ) 
                 TABLESPACE pg_default; 
-                ALTER TABLE IF EXISTS {SchemaAndTable} OWNER to postgres;";
+                ALTER TABLE IF EXISTS {SchemaAndTable} OWNER to postgres;
+                
+                INSERT INTO ""pluggable_metadata"".""tenant"" (tenant_id) VALUES ('{SchemaAndTable}') ON CONFLICT (tenant_id) DO NOTHING;
+                ";
 
             _logger.LogDebug($"{nameof(CreateTableIfNotExistsAsync)} - SQL : [{sql}]");
 
@@ -169,14 +197,15 @@ namespace Helpers
             return new Tuple<string,string>(null,null);
         }
 
-        public async Task UpsertAsync(string key, string value, string etag, NpgsqlTransaction transaction = null)
+        public async Task UpsertAsync(string key, string value, string etag, int ttl, NpgsqlTransaction transaction = null)
         {
             await EnsureDatabaseResourcesExistAsync(transaction);
-            await InsertOrUpdateAsync(key, value, etag, transaction);
+            await InsertOrUpdateAsync(key, value, etag, ttl, transaction);
         }
 
         private async Task EnsureDatabaseResourcesExistAsync(NpgsqlTransaction transaction = null)
         {
+            await GateAccessToResourceCreationAsync("tenant_metadata", () => CreateTenantMetadataTableIfNotExistsAsync(transaction));
             await GateAccessToResourceCreationAsync($"S:{_schema}", () => CreateSchemaIfNotExistsAsync(transaction));
             await GateAccessToResourceCreationAsync($"T:{_schema}-{_table}", () => CreateTableIfNotExistsAsync(transaction));
         }
@@ -206,10 +235,15 @@ namespace Helpers
             } 
         }
 
-        public async Task InsertOrUpdateAsync(string key, string value, string etag, NpgsqlTransaction transaction = null)
+        public async Task InsertOrUpdateAsync(string key, string value, string etag, int ttlInSeconds = 0, NpgsqlTransaction transaction = null)
         {
             int rowsAffected = 0;  
             var correlationId = Guid.NewGuid().ToString("N").Substring(23);
+
+            var queryExpiredate = "NULL";
+            if (ttlInSeconds > 0)
+		        queryExpiredate = $"CURRENT_TIMESTAMP + interval '{ttlInSeconds} seconds'";
+
 
             if (String.IsNullOrEmpty(etag))
             {
@@ -217,17 +251,20 @@ namespace Helpers
                 (
                     key
                     ,value
+                    ,expiredate
                 ) 
                 VALUES 
                 (
                     @1 
                     ,@2
+                    ,{queryExpiredate}
                 )
                 ON CONFLICT (key)
                 DO
                 UPDATE SET 
                     value = @2
-                    ,updatedate = NOW()
+                    ,updatedate = CURRENT_TIMESTAMP
+                    ,expiredate = {queryExpiredate}
                 ;";
 
                 _logger.LogDebug($"{nameof(InsertOrUpdateAsync)} ({correlationId}) - Etag not present - key: [{key}], value: [{value}], sql: [{query}]");
@@ -257,11 +294,12 @@ namespace Helpers
                 UPDATE {SchemaAndTable} 
                 SET 
                     value = @2
-                    ,updatedate = NOW()
+                    ,updatedate = CURRENT_TIMESTAMP
+                    ,expiredate = {queryExpiredate}
                 WHERE 
                     key = (@1)
-                    AND 
-                    xmin = (@3)
+                    AND xmin = (@3)
+                    AND (expiredate IS NULL OR expiredate > CURRENT_TIMESTAMP) 
                 ;";
                 
                 _logger.LogDebug($"{nameof(InsertOrUpdateAsync)} ({correlationId}) - Etag present - key: [{key}], value: [{value}], etag: [{etag}], sql: [{query}]");

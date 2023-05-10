@@ -12,12 +12,14 @@ namespace Helpers
         private const string DEFAULT_TABLE_NAME = "state";
         private const string DEFAULT_SCHEMA_NAME = "public";
         private IPgsqlFactory _pgsqlFactory;
+        private ILogger _logger;
         public Func<IReadOnlyDictionary<string, string>, NpgsqlConnection,ILogger, Pgsql>? TenantAwareDatabaseFactory { get; private set; }
 
         private string _connectionString;
         
-        public StateStoreInitHelper(IPgsqlFactory pgsqlFactory ){
+        public StateStoreInitHelper(IPgsqlFactory pgsqlFactory, ILogger logger){
             _pgsqlFactory = pgsqlFactory;
+            _logger = logger;
             TenantAwareDatabaseFactory = (_,_,_) => { throw new InvalidOperationException("Call 'InitAsync' first"); };
         }
 
@@ -33,7 +35,7 @@ namespace Helpers
             await connection.CloseAsync();
         }
 
-        public async Task<(Func<IReadOnlyDictionary<string,string>, Pgsql>, NpgsqlConnection)> GetDbFactory(ILogger logger)
+        public async Task<(Func<IReadOnlyDictionary<string,string>, Pgsql>, NpgsqlConnection)> GetDbFactory()
         {
             var connection = new NpgsqlConnection(_connectionString);
             await connection.OpenAsync();
@@ -41,7 +43,7 @@ namespace Helpers
 
             factory = (metadata) => {
 
-                return TenantAwareDatabaseFactory(metadata, connection, logger);
+                return TenantAwareDatabaseFactory(metadata, connection, _logger);
             };   
             return (factory, connection);
         }
