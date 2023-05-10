@@ -17,7 +17,7 @@ app.RegisterService(
             {   
                 var logger = context.ServiceProvider.GetRequiredService<ILogger<StateStoreService>>();
                 var helpers = context.ServiceProvider.GetService<PluggableStateStoreHelpers>();
-                var helper = new StateStoreInitHelper(new PgsqlFactory(), logger);
+                var helper = new StateStoreInitHelper(new PgsqlFactory(logger), logger);
                 helpers.Add(context.InstanceId, helper);
                      
                 return new StateStoreService(context.InstanceId, logger, helper);

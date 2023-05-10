@@ -175,7 +175,6 @@ public class StateStoreService : IStateStore, IPluggableComponentFeatures, IPlug
 
     public async Task TransactAsync(StateStoreTransactRequest request, CancellationToken cancellationToken = default)
     {
-
         _logger.LogInformation($"{nameof(TransactAsync)} - Set/Delete");
 
         if (!request.Operations.Any())

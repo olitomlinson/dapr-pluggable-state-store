@@ -20,7 +20,7 @@ public class ErrorHandlingTests
 
         var operationMetadata = new Dictionary<string,string>();
         
-        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null, null);
+        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null);
         Assert.Fail();
     }
 
@@ -51,6 +51,6 @@ public class ErrorHandlingTests
         await h.InitAsync(componentMetadata);
 
         var operationMetadata = new Dictionary<string, string>();
-        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null, null);
+        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null);
     }
 }

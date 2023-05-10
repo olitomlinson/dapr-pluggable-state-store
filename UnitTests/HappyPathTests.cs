@@ -20,9 +20,9 @@ public class HappyPathTests
         await h.InitAsync(componentMetadata);
 
         var operationMetadata = new Dictionary<string,string>();
-        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null, null);
+        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null);
 
-        pgsqlFactory.Received().Create("public", "state", null, Arg.Any<ILogger>());
+        pgsqlFactory.Received().Create("public", "state", null);
     }
 
     [TestMethod]
@@ -40,9 +40,9 @@ public class HappyPathTests
         var operationMetadata = new Dictionary<string, string>(){
             { "tenantId", "123"}};
 
-        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null, null);
+        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null);
 
-        pgsqlFactory.Received().Create("123-public", "state", null, Arg.Any<ILogger>());
+        pgsqlFactory.Received().Create("123-public", "state", null);
     }
 
     [TestMethod]
@@ -59,9 +59,9 @@ public class HappyPathTests
 
         var operationMetadata = new Dictionary<string, string>(){
         {"tenantId", "123"}};
-        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null, null);
+        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null);
 
-        pgsqlFactory.Received().Create("123-custom", "state", null, Arg.Any<ILogger>());
+        pgsqlFactory.Received().Create("123-custom", "state", null);
     }
 
     [TestMethod]
@@ -78,9 +78,9 @@ public class HappyPathTests
 
         var operationMetadata = new Dictionary<string, string>();
         operationMetadata.Add("tenantId", "123");
-        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null, null);
+        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null);
 
-        pgsqlFactory.Received().Create("public", "123-state", null, Arg.Any<ILogger>());
+        pgsqlFactory.Received().Create("public", "123-state", null);
     }
 
     [TestMethod]
@@ -98,8 +98,8 @@ public class HappyPathTests
 
         var operationMetadata = new Dictionary<string, string>();
         operationMetadata.Add("tenantId", "123");
-        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null, null);
+        h.TenantAwareDatabaseFactory?.Invoke(operationMetadata, null);
 
-        pgsqlFactory.Received().Create("public", "123-custom", null, Arg.Any<ILogger>());
+        pgsqlFactory.Received().Create("public", "123-custom", null);
     }
 }
