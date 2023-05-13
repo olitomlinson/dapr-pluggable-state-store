@@ -146,7 +146,7 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         );
     }
 
-[Theory]
+    [Theory]
     [MemberData(nameof(AllStores))]
     public async Task UpdatesWithEtag(string store)
     {
@@ -352,12 +352,35 @@ public class StateIsolationTests : IClassFixture<PluggableContainer>
         // If the key appears more than once, or in an unexpected location, there 
         // has been a catastrophic error.
     }
+
+    [Theory]
+    [MemberData(nameof(OnlyTenantStores))]
+    public async Task ExpiredKeysAreNotReturned(string store)
+    {
+        var key = GetRandomKey();
+        var seedValue = "Chicken";
+        var tenantId = Guid.NewGuid().ToString();
+
+        await _daprClient.SaveStateAsync(store, key, seedValue, metadata: tenantId.AsMetaData(ttl: "5"), cancellationToken: new CancellationTokenSource(5000).Token);
+        var firstGet = await _daprClient.GetStateAsync<string>(store, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+
+        Assert.Equal(seedValue,firstGet);
+
+        await Task.Delay(6000);
+        var SecondGet = await _daprClient.GetStateAsync<string>(store, key, metadata: tenantId.AsMetaData(), cancellationToken: new CancellationTokenSource(5000).Token);
+
+        Assert.Null(SecondGet);
+    }
 }
 
 public static class StringExtensions
 {
-    public static IReadOnlyDictionary<string,string> AsMetaData(this string tenantId){
-        return new Dictionary<string, string> {{ "tenantId", tenantId}};
+    public static IReadOnlyDictionary<string,string> AsMetaData(this string tenantId, string? ttl = null){
+        var dic = new Dictionary<string, string> {{ "tenantId", tenantId}};
+        if (!string.IsNullOrEmpty(ttl)){
+            dic.Add("ttlInSeconds", ttl);
+        }
+        return dic;
     }
 }
 public class TestClass 

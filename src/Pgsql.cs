@@ -181,7 +181,9 @@ namespace Helpers
                     ,xmin::text
                 FROM {SchemaAndTable} 
                 WHERE 
-                    key = (@key)";
+                    key = (@key)
+                    AND (expiredate IS NULL OR expiredate > CURRENT_TIMESTAMP)       
+                    ";
 
             _logger.LogInformation($"{nameof(GetAsync)} - key: [{key}], value: [{value}], sql: [{sql}]");
 
