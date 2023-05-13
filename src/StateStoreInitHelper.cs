@@ -23,6 +23,13 @@ namespace Helpers
             TenantAwareDatabaseFactory = (_,_) => { throw new InvalidOperationException("Call 'InitAsync' first"); };
         }
 
+        public string GetDatabaseConnectionString()
+        {
+            if (_connectionString == null)
+                return "";
+            else return _connectionString;
+        }
+
         public async Task PerformDatabaseProbeAsync()
         {
             var connection = new NpgsqlConnection(_connectionString);

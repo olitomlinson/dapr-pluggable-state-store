@@ -50,11 +50,15 @@ namespace Helpers
                 CREATE TABLE IF NOT EXISTS ""pluggable_metadata"".""tenant""
                 ( 
                     tenant_id text NOT NULL PRIMARY KEY COLLATE pg_catalog.""default"" 
+                    ,schema_id text NOT NULL
+                    ,table_id text NOT NULL
                     ,insert_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
                     ,last_expired_at TIMESTAMP WITH TIME ZONE NULL
                 ) 
                 TABLESPACE pg_default; 
                 ALTER TABLE IF EXISTS ""pluggable_metadata"".""tenant"" OWNER to postgres;
+
+                CREATE INDEX IF NOT EXISTS pluggable_metadata_tenant_last_expired_at ON ""pluggable_metadata"".""tenant"" (last_expired_at ASC NULLS FIRST);
                 ";
 
             _logger.LogDebug($"{nameof(CreateTenantMetadataTableIfNotExistsAsync)} - {sql}");
@@ -142,7 +146,7 @@ namespace Helpers
                 TABLESPACE pg_default; 
                 ALTER TABLE IF EXISTS {SchemaAndTable} OWNER to postgres;
                 
-                INSERT INTO ""pluggable_metadata"".""tenant"" (tenant_id) VALUES ('{SchemaAndTable}') ON CONFLICT (tenant_id) DO NOTHING;
+                INSERT INTO ""pluggable_metadata"".""tenant"" (tenant_id, schema_id, table_id) VALUES ('{SchemaAndTable}', '{_schema}', '{_table}') ON CONFLICT (tenant_id) DO NOTHING;
                 ";
 
             _logger.LogDebug($"{nameof(CreateTableIfNotExistsAsync)} - SQL : [{sql}]");
