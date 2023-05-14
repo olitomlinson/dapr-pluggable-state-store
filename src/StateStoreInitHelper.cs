@@ -54,7 +54,7 @@ namespace Helpers
 
         public async Task InitAsync(IReadOnlyDictionary<string,string> componentMetadataProperties){
             
-            (var isTenantAware, var tenantTarget) = IsTenantAware(componentMetadataProperties);        
+            var tenantMode = GetTenantMode(componentMetadataProperties);        
             
             _connectionString = GetConnectionString(componentMetadataProperties);
 
@@ -69,17 +69,10 @@ namespace Helpers
                         Schema and Table are not known until a state operation is requested, 
                         as we rely on a combination on the component metadata and operation metadata,
                     */
-
-                    if (!isTenantAware)
-                        return _pgsqlFactory.Create(
-                            defaultSchema, 
-                            defaultTable, 
-                            connection);
                     
                     var tenantId = GetTenantIdFromMetadata(operationMetadata);
-
                     
-                    switch(tenantTarget){
+                    switch(tenantMode){
                         case SCHEMA_KEYWORD :
                             return _pgsqlFactory.Create(
                                 schema:             $"{tenantId}-{defaultSchema}", 
@@ -96,12 +89,15 @@ namespace Helpers
                 };
         }
 
-        private (bool,string) IsTenantAware(IReadOnlyDictionary<string,string> properties){
+        private string GetTenantMode(IReadOnlyDictionary<string,string> properties){
             bool isTenantAware = (properties.TryGetValue(TENANT_KEYWORD, out string tenantTarget));
-            if (isTenantAware && !(new string[]{ SCHEMA_KEYWORD, TABLE_KEYWORD }.Contains(tenantTarget)))
-                throw new Exception($"Unsupported 'tenant' property value of '{tenantTarget}'. Use 'schema' or 'table' instead");
+            if (!isTenantAware)
+                throw new StateStoreInitHelperException($"Mandatory '{TENANT_KEYWORD}' metdadata property not specified.");
             
-            return (isTenantAware, tenantTarget);
+            if (!(new string[]{ SCHEMA_KEYWORD, TABLE_KEYWORD }.Contains(tenantTarget)))
+                throw new StateStoreInitHelperException($"Unsupported 'tenant' metadata property value of '{tenantTarget}'. Use 'schema' or 'table' instead.");
+            
+            return tenantTarget;
         }
 
         private string GetDefaultSchemaName(IReadOnlyDictionary<string,string> properties){
@@ -118,7 +114,7 @@ namespace Helpers
 
         private string GetConnectionString(IReadOnlyDictionary<string,string> properties){
             if (!properties.TryGetValue(CONNECTION_STRING_KEYWORD, out string connectionString))
-                throw new StateStoreInitHelperException($"Missing connection string - 'metadata.{CONNECTION_STRING_KEYWORD} is a mandatory property'");
+                throw new StateStoreInitHelperException($"Mandatory '{CONNECTION_STRING_KEYWORD}' metadata property not specified'");
             return connectionString;
         }
 
